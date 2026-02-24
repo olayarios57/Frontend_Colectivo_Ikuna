@@ -1,9 +1,9 @@
 import { Heart, Instagram, Facebook, Mail } from 'lucide-react';
 
-const WHATSAPP_URL = 'https://wa.me/1234567890';
+const WHATSAPP_URL = 'https://wa.me/573015816157';
 const INSTAGRAM_URL = 'https://instagram.com';
 const FACEBOOK_URL = 'https://facebook.com';
-const MAIL_URL = 'mailto:contacto@ikuna.com';
+const MAIL_URL = 'mailto:ikunacolectivo@gmail.com';
 
 const socialLinks = [
   { href: INSTAGRAM_URL, icon: Instagram, label: 'Instagram' },

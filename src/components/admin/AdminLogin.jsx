@@ -14,7 +14,7 @@ export function AdminLogin({ onLogin, onClose }) {
   const handleLogin = (e) => {
     e.preventDefault();
     if (credentials.username === 'admin' && credentials.password === 'ikuna2024') {
-      onLogin(true, { username: 'admin', role: 'superadmin', name: 'Administrador Principal', email: 'admin@ikuna.com' });
+      onLogin(true, { username: 'admin', role: 'superadmin', name: 'Administrador Principal', email: 'ikunacolectivo@gmail.com' });
     } else {
       setError('Usuario o contraseña incorrectos');
       setTimeout(() => setError(''), 3000);
@@ -41,17 +41,38 @@ export function AdminLogin({ onLogin, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}>
       <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+
         {/* Header */}
         <div className="p-6 relative" style={{ backgroundColor: '#1d1d1b' }}>
-          <button onClick={onClose} className="absolute top-4 right-4 p-2 hover:opacity-70 transition-opacity" style={{ color: 'white' }} aria-label="Close">
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-2 hover:opacity-70 transition-opacity"
+            style={{ color: 'white' }}
+            aria-label="Close"
+          >
             <X size={24} />
           </button>
           <div className="text-center">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: '#f18517' }}>
-              {viewMode === 'register' ? <UserPlus className="text-white" size={32} /> : viewMode === 'forgot' ? <Mail className="text-white" size={32} /> : <User className="text-white" size={32} />}
+            <div
+              className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+              style={{ backgroundColor: '#f18517' }}
+            >
+              {viewMode === 'register'
+                ? <UserPlus className="text-white" size={32} />
+                : viewMode === 'forgot'
+                ? <Mail className="text-white" size={32} />
+                : <User className="text-white" size={32} />
+              }
             </div>
-            <h2 className="text-2xl" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 400, color: 'white' }}>
-              {viewMode === 'register' ? 'Registro de Usuario' : viewMode === 'forgot' ? 'Recuperar Contraseña' : 'Acceso Administrador'}
+            <h2
+              className="text-2xl"
+              style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 400, color: 'white' }}
+            >
+              {viewMode === 'register'
+                ? 'Registro de Usuario'
+                : viewMode === 'forgot'
+                ? 'Recuperar Contraseña'
+                : 'Acceso Administrador'}
             </h2>
           </div>
         </div>
@@ -73,31 +94,61 @@ export function AdminLogin({ onLogin, onClose }) {
           {viewMode === 'login' && (
             <form onSubmit={handleLogin} className="space-y-6">
               <div>
-                <label htmlFor="username" className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Usuario</label>
+                <label htmlFor="username" className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>
+                  Usuario
+                </label>
                 <div className="relative">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#808080' }}><User size={20} /></div>
-                  <input type="text" id="username" required value={credentials.username}
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#808080' }}>
+                    <User size={20} />
+                  </div>
+                  <input
+                    type="text"
+                    id="username"
+                    required
+                    value={credentials.username}
                     onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
                     className="w-full pl-12 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all"
                     style={{ borderColor: '#e0e0e0', backgroundColor: '#f5f5f5', color: '#1d1d1b' }}
-                    placeholder="Ingresa tu usuario" />
+                    placeholder="Ingresa tu usuario"
+                  />
                 </div>
               </div>
+
               <div>
-                <label htmlFor="password" className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Contraseña</label>
+                <label htmlFor="password" className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>
+                  Contraseña
+                </label>
                 <div className="relative">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#808080' }}><Lock size={20} /></div>
-                  <input type="password" id="password" required value={credentials.password}
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#808080' }}>
+                    <Lock size={20} />
+                  </div>
+                  <input
+                    type="password"
+                    id="password"
+                    required
+                    value={credentials.password}
                     onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
                     className="w-full pl-12 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all"
                     style={{ borderColor: '#e0e0e0', backgroundColor: '#f5f5f5', color: '#1d1d1b' }}
-                    placeholder="Ingresa tu contraseña" />
+                    placeholder="Ingresa tu contraseña"
+                  />
                 </div>
               </div>
-              <button type="button" onClick={() => setViewMode('forgot')} className="text-sm hover:underline" style={{ color: '#f18517' }}>
+
+              <button
+                type="button"
+                onClick={() => setViewMode('forgot')}
+                className="text-sm hover:underline"
+                style={{ color: '#f18517' }}
+              >
                 ¿Olvidaste tu contraseña?
               </button>
-              <button type="submit" className="w-full px-8 py-3 rounded-lg hover:shadow-xl transition-all duration-300" style={{ backgroundColor: '#f18517', color: 'white' }}>
+
+              <button
+                type="submit"
+                className="w-full px-8 py-3 rounded-lg hover:shadow-xl transition-all duration-300"
+                style={{ backgroundColor: '#f18517', color: 'white' }}
+              >
                 Iniciar Sesión
               </button>
             </form>
@@ -107,22 +158,30 @@ export function AdminLogin({ onLogin, onClose }) {
           {viewMode === 'register' && (
             <form onSubmit={handleRegister} className="space-y-4">
               {[
-                { label: 'Nombre Completo',      key: 'name',            type: 'text',     placeholder: 'Tu nombre completo' },
-                { label: 'Correo Electrónico',   key: 'email',           type: 'email',    placeholder: 'tu@email.com' },
-                { label: 'Usuario',              key: 'username',        type: 'text',     placeholder: 'Nombre de usuario' },
-                { label: 'Contraseña',           key: 'password',        type: 'password', placeholder: 'Mínimo 8 caracteres' },
+                { label: 'Nombre Completo',      key: 'name',            type: 'text',     placeholder: 'Tu nombre completo'   },
+                { label: 'Correo Electrónico',   key: 'email',           type: 'email',    placeholder: 'tu@email.com'         },
+                { label: 'Usuario',              key: 'username',        type: 'text',     placeholder: 'Nombre de usuario'    },
+                { label: 'Contraseña',           key: 'password',        type: 'password', placeholder: 'Mínimo 8 caracteres'  },
                 { label: 'Confirmar Contraseña', key: 'confirmPassword', type: 'password', placeholder: 'Repite tu contraseña' },
               ].map(({ label, key, type, placeholder }) => (
                 <div key={key}>
                   <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>{label}</label>
-                  <input type={type} required value={registerData[key]}
+                  <input
+                    type={type}
+                    required
+                    value={registerData[key]}
                     onChange={(e) => setRegisterData({ ...registerData, [key]: e.target.value })}
                     className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
                     style={{ borderColor: '#e0e0e0', backgroundColor: '#f5f5f5' }}
-                    placeholder={placeholder} />
+                    placeholder={placeholder}
+                  />
                 </div>
               ))}
-              <button type="submit" className="w-full px-8 py-3 rounded-lg hover:shadow-xl transition-all duration-300" style={{ backgroundColor: '#f18517', color: 'white' }}>
+              <button
+                type="submit"
+                className="w-full px-8 py-3 rounded-lg hover:shadow-xl transition-all duration-300"
+                style={{ backgroundColor: '#f18517', color: 'white' }}
+              >
                 Solicitar Registro
               </button>
             </form>
@@ -132,43 +191,55 @@ export function AdminLogin({ onLogin, onClose }) {
           {viewMode === 'forgot' && (
             <form onSubmit={handleForgotPassword} className="space-y-6">
               <div>
-                <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Correo Electrónico</label>
+                <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>
+                  Correo Electrónico
+                </label>
                 <div className="relative">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#808080' }}><Mail size={20} /></div>
-                  <input type="email" required value={forgotEmail}
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#808080' }}>
+                    <Mail size={20} />
+                  </div>
+                  <input
+                    type="email"
+                    required
+                    value={forgotEmail}
                     onChange={(e) => setForgotEmail(e.target.value)}
                     className="w-full pl-12 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
                     style={{ borderColor: '#e0e0e0', backgroundColor: '#f5f5f5' }}
-                    placeholder="tu@email.com" />
+                    placeholder="tu@email.com"
+                  />
                 </div>
               </div>
-              <button type="submit" className="w-full px-8 py-3 rounded-lg hover:shadow-xl transition-all duration-300" style={{ backgroundColor: '#f18517', color: 'white' }}>
+              <button
+                type="submit"
+                className="w-full px-8 py-3 rounded-lg hover:shadow-xl transition-all duration-300"
+                style={{ backgroundColor: '#f18517', color: 'white' }}
+              >
                 Enviar Enlace de Recuperación
               </button>
             </form>
           )}
 
+          {/* Navigation links */}
           <div className="mt-6 text-center space-y-2">
             {viewMode === 'login' && (
-              <button onClick={() => setViewMode('register')} className="text-sm hover:underline" style={{ color: '#808080' }}>
+              <button
+                onClick={() => setViewMode('register')}
+                className="text-sm hover:underline"
+                style={{ color: '#808080' }}
+              >
                 ¿No tienes cuenta? Solicita registro
               </button>
             )}
             {(viewMode === 'register' || viewMode === 'forgot') && (
-              <button onClick={() => setViewMode('login')} className="text-sm hover:underline" style={{ color: '#808080' }}>
+              <button
+                onClick={() => setViewMode('login')}
+                className="text-sm hover:underline"
+                style={{ color: '#808080' }}
+              >
                 Volver al inicio de sesión
               </button>
             )}
           </div>
-
-          {viewMode === 'login' && (
-            <div className="mt-6 p-4 rounded-lg" style={{ backgroundColor: '#f5f5f5' }}>
-              <p className="text-sm text-center" style={{ color: '#808080' }}>
-                <strong>Demo Administrador Principal:</strong><br />
-                Usuario: admin / Contraseña: ikuna2024
-              </p>
-            </div>
-          )}
         </div>
       </div>
     </div>

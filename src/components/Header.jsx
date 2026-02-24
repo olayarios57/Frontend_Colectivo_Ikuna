@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Menu, X, User } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-import logoIkuna from '../assets/logo-ikuna.jpeg';
+import logoIkuna from '../assets/logo-ikuna.png';
 
 const navItems = [
   { id: '/',           label: 'Inicio'              },
