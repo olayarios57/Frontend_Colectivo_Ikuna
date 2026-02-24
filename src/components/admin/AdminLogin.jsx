@@ -1,35 +1,82 @@
 import { useState } from 'react';
 import { User, Lock, X, AlertCircle, UserPlus, Mail } from 'lucide-react';
+import { apiService } from '../../services/apiService'; // IMPORTANTE: Importamos el servicio
 
 export function AdminLogin({ onLogin, onClose }) {
   const [viewMode, setViewMode] = useState('login');
   const [credentials, setCredentials] = useState({ username: '', password: '' });
   const [registerData, setRegisterData] = useState({
-    name: '', email: '', username: '', password: '', confirmPassword: '', role: 'editor',
+    name: '', email: '', username: '', password: '', confirmPassword: '', role: 'COLLABORATOR',
   });
   const [forgotEmail, setForgotEmail] = useState('');
   const [error,   setError]   = useState('');
   const [success, setSuccess] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (credentials.username === 'admin' && credentials.password === 'ikuna2024') {
-      onLogin(true, { username: 'admin', role: 'superadmin', name: 'Administrador Principal', email: 'ikunacolectivo@gmail.com' });
-    } else {
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      // 1. USUARIO QUEMADO (HARDCODEADO) PARA ACCESO RÁPIDO
+      if (credentials.username === 'admin' && credentials.password === 'ikuna2024') {
+        onLogin(true, { 
+          username: 'admin', 
+          role: 'SUPER_ADMIN', // Debe ser SUPER_ADMIN para ver la pestaña de usuarios
+          name: 'Administrador Principal', 
+          email: 'admin@ikuna.com' 
+        });
+        return; // Detenemos la función aquí para que no llame al backend
+      }
+
+      // 2. SI NO ES EL ADMIN QUEMADO, LLAMADA REAL AL BACKEND
+      const user = await apiService.login(credentials);
+      
+      // Adaptamos la respuesta del backend para el frontend
+      onLogin(true, { 
+        username: user.username, 
+        role: user.role, 
+        name: user.fullName, 
+        email: user.email 
+      });
+    } catch (err) {
+      console.error(err);
       setError('Usuario o contraseña incorrectos');
       setTimeout(() => setError(''), 3000);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
     if (registerData.password !== registerData.confirmPassword) {
       setError('Las contraseñas no coinciden');
       setTimeout(() => setError(''), 3000);
       return;
     }
-    setSuccess('¡Registro exitoso! Tu solicitud está pendiente de aprobación por el administrador principal.');
-    setTimeout(() => { setSuccess(''); setViewMode('login'); }, 3000);
+
+    setIsLoading(true);
+    try {
+      // LLAMADA REAL AL BACKEND PARA REGISTRO
+      await apiService.register({
+        fullName: registerData.name,
+        email: registerData.email,
+        username: registerData.username,
+        password: registerData.password,
+        role: 'COLLABORATOR',
+        status: 'PENDING'
+      });
+      setSuccess('¡Registro exitoso! Tu solicitud está pendiente de aprobación.');
+      setTimeout(() => { setSuccess(''); setViewMode('login'); }, 3000);
+    } catch (err) {
+      console.error(err);
+      setError('Error al registrar. Verifica los datos o el usuario ya existe.');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleForgotPassword = (e) => {
@@ -143,13 +190,8 @@ export function AdminLogin({ onLogin, onClose }) {
               >
                 ¿Olvidaste tu contraseña?
               </button>
-
-              <button
-                type="submit"
-                className="w-full px-8 py-3 rounded-lg hover:shadow-xl transition-all duration-300"
-                style={{ backgroundColor: '#f18517', color: 'white' }}
-              >
-                Iniciar Sesión
+              <button type="submit" disabled={isLoading} className="w-full px-8 py-3 rounded-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50" style={{ backgroundColor: '#f18517', color: 'white' }}>
+                {isLoading ? 'Iniciando...' : 'Iniciar Sesión'}
               </button>
             </form>
           )}
@@ -158,7 +200,7 @@ export function AdminLogin({ onLogin, onClose }) {
           {viewMode === 'register' && (
             <form onSubmit={handleRegister} className="space-y-4">
               {[
-                { label: 'Nombre Completo',      key: 'name',            type: 'text',     placeholder: 'Tu nombre completo'   },
+                { label: 'Nombre Completo',  key: 'name',            type: 'text',     placeholder: 'Tu nombre completo'   },
                 { label: 'Correo Electrónico',   key: 'email',           type: 'email',    placeholder: 'tu@email.com'         },
                 { label: 'Usuario',              key: 'username',        type: 'text',     placeholder: 'Nombre de usuario'    },
                 { label: 'Contraseña',           key: 'password',        type: 'password', placeholder: 'Mínimo 8 caracteres'  },
@@ -177,12 +219,8 @@ export function AdminLogin({ onLogin, onClose }) {
                   />
                 </div>
               ))}
-              <button
-                type="submit"
-                className="w-full px-8 py-3 rounded-lg hover:shadow-xl transition-all duration-300"
-                style={{ backgroundColor: '#f18517', color: 'white' }}
-              >
-                Solicitar Registro
+              <button type="submit" disabled={isLoading} className="w-full px-8 py-3 rounded-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50" style={{ backgroundColor: '#f18517', color: 'white' }}>
+                {isLoading ? 'Solicitando...' : 'Solicitar Registro'}
               </button>
             </form>
           )}
