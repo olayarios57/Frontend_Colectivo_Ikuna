@@ -1,8 +1,7 @@
 import { MessageCircle } from 'lucide-react';
 
 const WHATSAPP_URL =
-  'https://wa.me/1234567890?text=Hola%20IKUNA%2C%20me%20gustaría%20conocer%20más%20información';
-
+  'https://wa.me/573015816157?text=Saludos%20Ikunistas%2C%20quisiera%20recibir%20m%C3%A1s%20informaci%C3%B3n%20sobre%20los%20proyectos%20y%20servicios%20que%20brindan.';
 export function WhatsAppButton() {
   return (
     <a

@@ -25,8 +25,7 @@ const services = [
 ];
 
 const WHATSAPP_URL =
-  'https://wa.me/1234567890?text=Hola%20IKUNA%2C%20estoy%20interesado%20en%20sus%20servicios';
-
+'https://wa.me/573015816157?text=Saludos%20Ikunistas%2C%20quisiera%20recibir%20m%C3%A1s%20informaci%C3%B3n%20sobre%20los%20proyectos%20y%20servicios%20que%20brindan.';
 export function Services() {
   return (
     <div className="py-16 px-6" style={{ backgroundColor: '#f5f5f5' }}>

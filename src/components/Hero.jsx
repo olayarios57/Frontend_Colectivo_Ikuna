@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, ArrowRight, Sparkles, Calendar, Users, Heart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-import logoIkuna from '../assets/logo-ikuna.jpeg';
+import logoIkuna from '../assets/logo-ikuna.png';
 
 const carouselImages = [
   'https://images.unsplash.com/photo-1761124739660-c2410c5d917c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080',
@@ -20,7 +20,7 @@ const highlights = [
   { id: 4, icon: Heart,    title: '8 Aliados',       description: 'Estratégicos regionales'        },
 ];
 
-const WHATSAPP_CONTACT = 'https://wa.me/1234567890?text=Hola%20IKUNA';
+const WHATSAPP_CONTACT = 'https://wa.me/573015816157?text=Saludos%20Ikunistas%2C%20quisiera%20recibir%20m%C3%A1s%20informaci%C3%B3n%20sobre%20los%20proyectos%20y%20servicios%20que%20brindan.';
 
 export function Hero() {
   const [currentSlide, setCurrentSlide] = useState(0);
