@@ -19,7 +19,18 @@ export function AdminLogin({ onLogin, onClose }) {
     setError('');
     
     try {
-      // LLAMADA REAL AL BACKEND
+      // 1. USUARIO QUEMADO (HARDCODEADO) PARA ACCESO RÁPIDO
+      if (credentials.username === 'admin' && credentials.password === 'ikuna2024') {
+        onLogin(true, { 
+          username: 'admin', 
+          role: 'SUPER_ADMIN', // Debe ser SUPER_ADMIN para ver la pestaña de usuarios
+          name: 'Administrador Principal', 
+          email: 'admin@ikuna.com' 
+        });
+        return; // Detenemos la función aquí para que no llame al backend
+      }
+
+      // 2. SI NO ES EL ADMIN QUEMADO, LLAMADA REAL AL BACKEND
       const user = await apiService.login(credentials);
       
       // Adaptamos la respuesta del backend para el frontend
@@ -189,7 +200,7 @@ export function AdminLogin({ onLogin, onClose }) {
           {viewMode === 'register' && (
             <form onSubmit={handleRegister} className="space-y-4">
               {[
-                { label: 'Nombre Completo',      key: 'name',            type: 'text',     placeholder: 'Tu nombre completo'   },
+                { label: 'Nombre Completo',  key: 'name',            type: 'text',     placeholder: 'Tu nombre completo'   },
                 { label: 'Correo Electrónico',   key: 'email',           type: 'email',    placeholder: 'tu@email.com'         },
                 { label: 'Usuario',              key: 'username',        type: 'text',     placeholder: 'Nombre de usuario'    },
                 { label: 'Contraseña',           key: 'password',        type: 'password', placeholder: 'Mínimo 8 caracteres'  },
