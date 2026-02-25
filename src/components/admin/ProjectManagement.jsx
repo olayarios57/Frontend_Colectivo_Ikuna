@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Plus, Edit, Edit2, Trash2, Users, Calendar, Clock, X, Save } from 'lucide-react';
-import { apiService } from '../../services/apiService'; // IMPORTANTE: Importamos la API
+import { Plus, Edit, Edit2, Trash2, Users, Calendar, Clock, X, Save, AlertCircle } from 'lucide-react';
+import { apiService } from '../../services/apiService';
 
 const COP = (v) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v || 0);
@@ -13,34 +13,63 @@ export function ProjectManagement({ projects = [], onProjectsChange }) {
   const [showEditProjectModal, setShowEditProjectModal]= useState(false);
   const [showTaskModal,        setShowTaskModal]       = useState(false);
   const [showMemberModal,      setShowMemberModal]     = useState(false);
+  
   const [newTask,              setNewTask]             = useState({});
   const [newMember,            setNewMember]           = useState({});
   const [newProject,           setNewProject]          = useState(EMPTY_PROJECT);
   const [editProject,          setEditProject]         = useState(null);
+  
   const [isSaving,             setIsSaving]            = useState(false);
+  // NUEVO: Estado global para manejar errores del backend en los modales
+  const [error,                setError]               = useState('');
 
-  // Mapeo de estados visuales
   const getStatusColor = (s) => ({ completed: '#28a745', 'in-progress': '#ffc107', upcoming: '#17a2b8', pending: '#6c757d' }[s] || '#808080');
   const getStatusLabel = (s) => ({ completed: 'Completado', 'in-progress': 'En Progreso', upcoming: 'Próximo', pending: 'Pendiente' }[s] || s);
 
   const push = (updated) => { if (onProjectsChange) onProjectsChange(updated); };
 
-  // ── Crear proyecto (CONECTADO AL BACKEND) ────────────────────────────────────────────
-  const handleAddProject = async () => {
-    if (!newProject.title.trim() || !newProject.date || !Number(newProject.budget)) return;
-    setIsSaving(true);
+  // NUEVO: Función auxiliar para extraer el mensaje de error del backend
+  const handleBackendError = (err, defaultMessage) => {
+    console.error(err);
+    if (err.response && err.response.data) {
+      // Si es un error de validación de DTO (MethodArgumentNotValidException)
+      const backendErrors = Object.values(err.response.data);
+      if (backendErrors.length > 0 && typeof backendErrors[0] === 'string') {
+        setError(backendErrors[0]);
+        return;
+      }
+      // Si es un error de negocio (IllegalArgumentException)
+      if (err.response.data.error) {
+        setError(err.response.data.error);
+        return;
+      }
+    }
+    setError(defaultMessage);
+  };
 
-    // Adaptamos el frontend a lo que exige el DTO del backend
+  // ── Limpiar modales y errores ─────────────────────────────────────────────
+  const closeAllModals = () => {
+    setShowNewProjectModal(false);
+    setShowEditProjectModal(false);
+    setShowTaskModal(false);
+    setShowMemberModal(false);
+    setError(''); // Limpiamos el error al cerrar
+  };
+
+  // ── Crear proyecto ────────────────────────────────────────────
+  const handleAddProject = async () => {
+    setError('');
+    setIsSaving(true);
     const backendStatus = newProject.status === 'upcoming' ? 'pending' : newProject.status;
     
     const projectPayload = {
       title: newProject.title.trim(),
       category: newProject.category,
       date: newProject.date,
-      status: backendStatus, // El backend solo acepta: pending, in-progress, completed
+      status: backendStatus,
       progress: Number(newProject.progress) || 0,
-      description: "Descripción inicial del proyecto pendiente de actualización.", // Obligatorio min 20 chars en Backend
-      imageUrl: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800", // Obligatorio URL en Backend
+      description: "Descripción inicial del proyecto pendiente de actualización.", 
+      imageUrl: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800",
       totalBudget: Number(newProject.budget) || 0,
       executedBudget: 0,
       teamMembers: [],
@@ -48,15 +77,12 @@ export function ProjectManagement({ projects = [], onProjectsChange }) {
     };
 
     try {
-      // LLAMADA AL BACKEND
       const savedProject = await apiService.createProject(projectPayload);
-      
-      push([...projects, savedProject]); // Actualiza la UI con el proyecto real de MySQL
+      push([...projects, savedProject]);
       setNewProject(EMPTY_PROJECT);
-      setShowNewProjectModal(false);
-    } catch (error) {
-      console.error("Error al crear proyecto en el backend:", error);
-      alert("Error al guardar el proyecto. Verifica los datos.");
+      closeAllModals();
+    } catch (err) {
+      handleBackendError(err, "Error al guardar el proyecto. Verifica los datos.");
     } finally {
       setIsSaving(false);
     }
@@ -65,6 +91,7 @@ export function ProjectManagement({ projects = [], onProjectsChange }) {
   // ── Abrir edición de proyecto ─────────────────────────────────
   const openEditProject = (project, e) => {
     e.stopPropagation();
+    setError('');
     setEditProject({
       id:       project.id,
       title:    project.title,
@@ -72,22 +99,20 @@ export function ProjectManagement({ projects = [], onProjectsChange }) {
       date:     project.date,
       status:   project.status,
       progress: project.progress,
-      budget:   project.totalBudget || project.budget || 0, // Ajustado a DTO
+      budget:   project.totalBudget || project.budget || 0,
     });
     setShowEditProjectModal(true);
   };
 
-  // ── Guardar edición de proyecto (CONECTADO AL BACKEND) ───────────────────────────────
+  // ── Guardar edición de proyecto ───────────────────────────────
   const handleSaveEditProject = async () => {
-    if (!editProject.title.trim() || !editProject.date || !Number(editProject.budget)) return;
+    setError('');
     setIsSaving(true);
-
-    // Buscar proyecto original para no perder sus datos (tareas, miembros, descripcion)
     const originalProject = projects.find(p => p.id === editProject.id);
     const backendStatus = editProject.status === 'upcoming' ? 'pending' : editProject.status;
 
     const projectPayload = {
-      ...originalProject, // Mantiene descripcion, imageUrl, tareas y miembros
+      ...originalProject,
       title:    editProject.title.trim(),
       category: editProject.category,
       date:     editProject.date,
@@ -97,28 +122,25 @@ export function ProjectManagement({ projects = [], onProjectsChange }) {
     };
 
     try {
-      // LLAMADA PUT AL BACKEND
       const updatedProject = await apiService.updateProject(editProject.id, projectPayload);
-      
       const updatedList = projects.map(p => p.id === editProject.id ? updatedProject : p);
       push(updatedList);
       
       if (selectedProject?.id === editProject.id) {
         setSelectedProject(updatedProject);
       }
-      setShowEditProjectModal(false);
       setEditProject(null);
-    } catch (error) {
-      console.error("Error actualizando el proyecto:", error);
-      alert("Error al actualizar el proyecto.");
+      closeAllModals();
+    } catch (err) {
+      handleBackendError(err, "Error al actualizar el proyecto.");
     } finally {
       setIsSaving(false);
     }
   };
 
-  // ── Agregar tarea (CONECTADO AL BACKEND) ─────────────────────────────────────────────
+  // ── Agregar tarea ─────────────────────────────────────────────
   const handleAddTask = async () => {
-    if (!selectedProject || !newTask.title) return;
+    setError('');
     setIsSaving(true);
 
     const task = {
@@ -135,24 +157,21 @@ export function ProjectManagement({ projects = [], onProjectsChange }) {
     };
 
     try {
-      // Para guardar una tarea, enviamos el proyecto actualizado al backend (Cascade)
       const updatedProject = await apiService.updateProject(selectedProject.id, updatedProjectData);
-      
       push(projects.map(p => p.id === selectedProject.id ? updatedProject : p));
       setSelectedProject(updatedProject);
       setNewTask({});
-      setShowTaskModal(false);
-    } catch (error) {
-      console.error("Error agregando tarea:", error);
-      alert("Error al guardar la tarea.");
+      closeAllModals();
+    } catch (err) {
+      handleBackendError(err, "Error al guardar la tarea. Verifica las fechas y datos.");
     } finally {
       setIsSaving(false);
     }
   };
 
-  // ── Agregar miembro (CONECTADO AL BACKEND) ───────────────────────────────────────────
+  // ── Agregar miembro ───────────────────────────────────────────
   const handleAddMember = async () => {
-    if (!selectedProject || !newMember.name || !newMember.email) return;
+    setError('');
     setIsSaving(true);
 
     const member = { 
@@ -168,20 +187,18 @@ export function ProjectManagement({ projects = [], onProjectsChange }) {
 
     try {
       const updatedProject = await apiService.updateProject(selectedProject.id, updatedProjectData);
-      
       push(projects.map(p => p.id === selectedProject.id ? updatedProject : p));
       setSelectedProject(updatedProject);
       setNewMember({});
-      setShowMemberModal(false);
-    } catch (error) {
-      console.error("Error agregando miembro:", error);
-      alert("Error al agregar el miembro al equipo.");
+      closeAllModals();
+    } catch (err) {
+      handleBackendError(err, "Error al agregar el miembro. Verifica el formato del email.");
     } finally {
       setIsSaving(false);
     }
   };
 
-  // ── Eliminar miembro (CONECTADO AL BACKEND) ──────────────────────────────────────────
+  // ── Eliminar miembro ──────────────────────────────────────────
   const handleDeleteMember = async (memberId) => {
     if(!window.confirm("¿Seguro que deseas eliminar este miembro?")) return;
     
@@ -210,7 +227,7 @@ export function ProjectManagement({ projects = [], onProjectsChange }) {
           <h2 className="text-xl" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#1d1d1b' }}>
             Gestión de Proyectos
           </h2>
-          <button onClick={() => setShowNewProjectModal(true)}
+          <button onClick={() => { setError(''); setShowNewProjectModal(true); }}
             className="flex items-center gap-2 px-4 py-2 rounded-lg transition-all hover:shadow-lg"
             style={{ backgroundColor: '#f18517', color: 'white' }}>
             <Plus size={20} /> Nuevo Proyecto
@@ -245,7 +262,6 @@ export function ProjectManagement({ projects = [], onProjectsChange }) {
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getStatusColor(project.status) }} />
                     {getStatusLabel(project.status)}
                   </span>
-                  {/* Botón editar proyecto */}
                   <button onClick={(e) => openEditProject(project, e)}
                     className="p-2 rounded-lg hover:bg-blue-50 transition-colors" title="Editar proyecto"
                     style={{ color: '#17a2b8' }}>
@@ -281,9 +297,16 @@ export function ProjectManagement({ projects = [], onProjectsChange }) {
           <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#1d1d1b' }}>Nuevo Proyecto</h3>
-              <button onClick={() => { setShowNewProjectModal(false); setNewProject(EMPTY_PROJECT); }}
+              <button onClick={() => { closeAllModals(); setNewProject(EMPTY_PROJECT); }}
                 className="p-2 hover:bg-gray-100 rounded-lg" style={{ color: '#808080' }}><X size={24} /></button>
             </div>
+            
+            {error && (
+              <div className="mb-4 p-3 rounded-lg flex items-center gap-2 text-sm" style={{ backgroundColor: '#f8d7da', color: '#721c24' }}>
+                <AlertCircle size={16} /> {error}
+              </div>
+            )}
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Nombre del proyecto *</label>
@@ -338,9 +361,9 @@ export function ProjectManagement({ projects = [], onProjectsChange }) {
                   disabled={!newProject.title.trim() || !newProject.date || !Number(newProject.budget) || isSaving}
                   className="flex-1 px-4 py-3 rounded-lg hover:shadow-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed font-medium"
                   style={{ backgroundColor: '#f18517', color: 'white' }}>
-                  {isSaving ? 'Guardando en BD...' : 'Crear Proyecto'}
+                  {isSaving ? 'Guardando...' : 'Crear Proyecto'}
                 </button>
-                <button onClick={() => { setShowNewProjectModal(false); setNewProject(EMPTY_PROJECT); }}
+                <button onClick={() => { closeAllModals(); setNewProject(EMPTY_PROJECT); }}
                   className="px-4 py-3 rounded-lg border hover:bg-gray-50 transition-colors"
                   style={{ borderColor: '#e0e0e0', color: '#808080' }}>Cancelar</button>
               </div>
@@ -355,9 +378,16 @@ export function ProjectManagement({ projects = [], onProjectsChange }) {
           <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#1d1d1b' }}>Editar Proyecto</h3>
-              <button onClick={() => { setShowEditProjectModal(false); setEditProject(null); }}
+              <button onClick={() => { closeAllModals(); setEditProject(null); }}
                 className="p-2 hover:bg-gray-100 rounded-lg" style={{ color: '#808080' }}><X size={24} /></button>
             </div>
+
+            {error && (
+              <div className="mb-4 p-3 rounded-lg flex items-center gap-2 text-sm" style={{ backgroundColor: '#f8d7da', color: '#721c24' }}>
+                <AlertCircle size={16} /> {error}
+              </div>
+            )}
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Nombre del proyecto *</label>
@@ -412,7 +442,7 @@ export function ProjectManagement({ projects = [], onProjectsChange }) {
                   style={{ backgroundColor: '#28a745', color: 'white' }}>
                   <Save size={18} /> {isSaving ? 'Guardando...' : 'Guardar Cambios'}
                 </button>
-                <button onClick={() => { setShowEditProjectModal(false); setEditProject(null); }}
+                <button onClick={() => { closeAllModals(); setEditProject(null); }}
                   className="px-4 py-3 rounded-lg border hover:bg-gray-50 transition-colors"
                   style={{ borderColor: '#e0e0e0', color: '#808080' }}>Cancelar</button>
               </div>
@@ -423,7 +453,7 @@ export function ProjectManagement({ projects = [], onProjectsChange }) {
 
       {/* ══ MODAL: Detalles del proyecto (TAREAS Y MIEMBROS) ════════════════════════════ */}
       {selectedProject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}>
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}>
           <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             <div className="p-6 border-b flex items-center justify-between flex-shrink-0" style={{ borderColor: '#e0e0e0' }}>
               <div>
@@ -443,7 +473,7 @@ export function ProjectManagement({ projects = [], onProjectsChange }) {
                   <h3 className="text-lg flex items-center gap-2" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#1d1d1b' }}>
                     <Users size={20} style={{ color: '#f18517' }} /> Equipo de Trabajo
                   </h3>
-                  <button onClick={() => setShowMemberModal(true)}
+                  <button onClick={() => { setError(''); setShowMemberModal(true); }}
                     className="px-3 py-2 rounded-lg text-sm flex items-center gap-2 hover:shadow-lg transition-all"
                     style={{ backgroundColor: '#f18517', color: 'white' }}>
                     <Plus size={16} /> Agregar Miembro
@@ -474,7 +504,7 @@ export function ProjectManagement({ projects = [], onProjectsChange }) {
                   <h3 className="text-lg flex items-center gap-2" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#1d1d1b' }}>
                     <Clock size={20} style={{ color: '#f18517' }} /> Tareas del Proyecto
                   </h3>
-                  <button onClick={() => setShowTaskModal(true)}
+                  <button onClick={() => { setError(''); setShowTaskModal(true); }}
                     className="px-3 py-2 rounded-lg text-sm flex items-center gap-2 hover:shadow-lg transition-all"
                     style={{ backgroundColor: '#f18517', color: 'white' }}>
                     <Plus size={16} /> Nueva Tarea
@@ -513,8 +543,15 @@ export function ProjectManagement({ projects = [], onProjectsChange }) {
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#1d1d1b' }}>Nueva Tarea</h3>
-              <button onClick={() => { setShowTaskModal(false); setNewTask({}); }} className="p-2 hover:bg-gray-100 rounded-lg" style={{ color: '#808080' }}><X size={20} /></button>
+              <button onClick={() => { closeAllModals(); setNewTask({}); }} className="p-2 hover:bg-gray-100 rounded-lg" style={{ color: '#808080' }}><X size={20} /></button>
             </div>
+            
+            {error && (
+              <div className="mb-4 p-3 rounded-lg flex items-center gap-2 text-sm" style={{ backgroundColor: '#f8d7da', color: '#721c24' }}>
+                <AlertCircle size={16} /> {error}
+              </div>
+            )}
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Nombre de la tarea *</label>
@@ -544,7 +581,7 @@ export function ProjectManagement({ projects = [], onProjectsChange }) {
                 <button onClick={handleAddTask} disabled={!newTask.title || isSaving}
                   className="flex-1 px-4 py-3 rounded-lg hover:shadow-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{ backgroundColor: '#f18517', color: 'white' }}>{isSaving ? 'Guardando...' : 'Agregar Tarea'}</button>
-                <button onClick={() => { setShowTaskModal(false); setNewTask({}); }}
+                <button onClick={() => { closeAllModals(); setNewTask({}); }}
                   className="px-4 py-3 rounded-lg border hover:bg-gray-50 transition-colors"
                   style={{ borderColor: '#e0e0e0', color: '#808080' }}>Cancelar</button>
               </div>
@@ -559,8 +596,15 @@ export function ProjectManagement({ projects = [], onProjectsChange }) {
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#1d1d1b' }}>Agregar Miembro al Equipo</h3>
-              <button onClick={() => { setShowMemberModal(false); setNewMember({}); }} className="p-2 hover:bg-gray-100 rounded-lg" style={{ color: '#808080' }}><X size={20} /></button>
+              <button onClick={() => { closeAllModals(); setNewMember({}); }} className="p-2 hover:bg-gray-100 rounded-lg" style={{ color: '#808080' }}><X size={20} /></button>
             </div>
+
+            {error && (
+              <div className="mb-4 p-3 rounded-lg flex items-center gap-2 text-sm" style={{ backgroundColor: '#f8d7da', color: '#721c24' }}>
+                <AlertCircle size={16} /> {error}
+              </div>
+            )}
+
             <div className="space-y-4">
               {[
                 { label: 'Nombre completo *',  key: 'name',  type: 'text',  placeholder: 'Ej: María González'          },
@@ -578,7 +622,7 @@ export function ProjectManagement({ projects = [], onProjectsChange }) {
                 <button onClick={handleAddMember} disabled={!newMember.name || !newMember.email || isSaving}
                   className="flex-1 px-4 py-3 rounded-lg hover:shadow-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{ backgroundColor: '#f18517', color: 'white' }}>{isSaving ? 'Guardando...' : 'Agregar Miembro'}</button>
-                <button onClick={() => { setShowMemberModal(false); setNewMember({}); }}
+                <button onClick={() => { closeAllModals(); setNewMember({}); }}
                   className="px-4 py-3 rounded-lg border hover:bg-gray-50 transition-colors"
                   style={{ borderColor: '#e0e0e0', color: '#808080' }}>Cancelar</button>
               </div>
