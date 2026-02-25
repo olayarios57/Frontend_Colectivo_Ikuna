@@ -1,211 +1,456 @@
 import { useState } from 'react';
-import { DollarSign, Plus, TrendingUp, TrendingDown, PieChart, X } from 'lucide-react';
+import { Plus, X, TrendingUp, DollarSign, AlertTriangle, CheckCircle, Edit2, Save } from 'lucide-react';
 
-export function BudgetManagement() {
-  const [showExpenseModal, setShowExpenseModal] = useState(false);
-  const [newExpense,        setNewExpense]       = useState({});
+const COP = (v) =>
+  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v || 0);
 
-  const projectsBudget = [
-    { id: 1, name: 'Plaza Cultural Centro',         totalBudget: 50000000, spent: 50000000, remaining: 0 },
-    { id: 2, name: 'Noche de Cultura Viva',         totalBudget: 30000000, spent: 19500000, remaining: 10500000 },
-    { id: 3, name: 'Festival Cultural Ikuna',       totalBudget: 80000000, spent: 32000000, remaining: 48000000 },
-    { id: 4, name: 'Taller de Teatro Comunitario',  totalBudget: 15000000, spent: 1500000,  remaining: 13500000 },
-  ];
+const CATEGORIES = ['Materiales', 'Servicios', 'Personal', 'Marketing', 'Logística', 'Otros'];
 
-  const totalBudget    = projectsBudget.reduce((sum, p) => sum + p.totalBudget, 0);
-  const totalSpent     = projectsBudget.reduce((sum, p) => sum + p.spent,       0);
-  const totalRemaining = projectsBudget.reduce((sum, p) => sum + p.remaining,   0);
+const CATEGORY_STYLE = {
+  Materiales: { bg: '#e3f2fd', color: '#1565c0' },
+  Servicios:  { bg: '#fff3e0', color: '#e65100' },
+  Personal:   { bg: '#f3e5f5', color: '#6a1b9a' },
+  Marketing:  { bg: '#e8f5e9', color: '#2e7d32' },
+  Logística:  { bg: '#fce4ec', color: '#880e4f' },
+  Otros:      { bg: '#f5f5f5', color: '#616161' },
+};
 
-  const [expenses, setExpenses] = useState([
-    { id: 1, projectId: 1, projectName: 'Plaza Cultural Centro',   type: 'Materiales de construcción', paidTo: 'Ferretería El Constructor', amount: 5000000,  date: '2024-01-15', category: 'material' },
-    { id: 2, projectId: 2, projectName: 'Noche de Cultura Viva',  type: 'Sonido e iluminación',        paidTo: 'Producciones AV',           amount: 8000000,  date: '2024-02-10', category: 'service' },
-    { id: 3, projectId: 3, projectName: 'Festival Cultural Ikuna', type: 'Honorarios artistas',         paidTo: 'Grupo Musical Los Andes',   amount: 12000000, date: '2024-03-05', category: 'personnel' },
-  ]);
+const EMPTY_EXPENSE = { projectId: '', type: '', category: 'Otros', paidTo: '', amount: '', date: '' };
 
-  const formatCurrency = (amount) =>
-    new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(amount);
+export function BudgetManagement({ projects = [], onProjectsChange }) {
+  const [showExpenseModal,  setShowExpenseModal]  = useState(false);
+  const [showEditModal,     setShowEditModal]      = useState(false);
+  const [editingExpense,    setEditingExpense]     = useState(null); // { expense, projectId }
+  const [newExpense,        setNewExpense]         = useState(EMPTY_EXPENSE);
+  const [editForm,          setEditForm]           = useState(EMPTY_EXPENSE);
 
-  const getCategoryColor = (category) => {
-    const colors = { material: '#17a2b8', service: '#ffc107', personnel: '#28a745', transport: '#6f42c1', other: '#6c757d' };
-    return colors[category] || '#808080';
+  const budgetProjects = projects.filter(p => p.budget > 0);
+  const totalBudget    = budgetProjects.reduce((s, p) => s + (p.budget || 0), 0);
+  const totalSpent     = budgetProjects.reduce((s, p) => s + (p.spent  || 0), 0);
+  const totalLeft      = totalBudget - totalSpent;
+  const globalPct      = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
+
+  const allExpenses = budgetProjects
+    .flatMap(p => (p.expenses || []).map(e => ({ ...e, projectTitle: p.title, projectId: p.id })))
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const barColor = (pct) => pct >= 100 ? '#dc3545' : pct >= 75 ? '#ffc107' : '#28a745';
+
+  // Recalcula spent y status de un proyecto a partir de sus expenses
+  const recalcProject = (p) => {
+    const newSpent    = (p.expenses || []).reduce((s, e) => s + (e.amount || 0), 0);
+    const newProgress = p.budget > 0 ? Math.min(Math.round((newSpent / p.budget) * 100), 100) : p.progress;
+    // Estado: completado SOLO si presupuesto 100% ejecutado
+    const newStatus   = newProgress >= 100 ? 'completed' : newProgress > 0 ? 'in-progress' : 'upcoming';
+    return { ...p, spent: newSpent, progress: newProgress, status: newStatus };
   };
 
-  const getCategoryLabel = (category) => {
-    const labels = { material: 'Materiales', service: 'Servicios', personnel: 'Personal', transport: 'Transporte', other: 'Otros' };
-    return labels[category] || category;
-  };
-
+  // ── Agregar gasto ─────────────────────────────────────────────
   const handleAddExpense = () => {
-    if (newExpense.type && newExpense.paidTo && newExpense.amount && newExpense.projectId) {
-      const project = projectsBudget.find((p) => p.id === newExpense.projectId);
-      const expense = {
-        id: Date.now(),
-        projectId:   newExpense.projectId,
-        projectName: project?.name || '',
-        type:        newExpense.type,
-        paidTo:      newExpense.paidTo,
-        amount:      newExpense.amount,
-        date:        newExpense.date || new Date().toISOString().split('T')[0],
-        category:    newExpense.category || 'other',
-      };
-      setExpenses([...expenses, expense]);
-      setNewExpense({});
-      setShowExpenseModal(false);
-    }
+    if (!newExpense.projectId || !newExpense.type || !newExpense.amount || !newExpense.date) return;
+    const amount = Number(newExpense.amount) || 0;
+    if (amount <= 0) return;
+
+    // Bloquear si supera el presupuesto disponible
+    const proj = projects.find(p => p.id === Number(newExpense.projectId));
+    if (proj && amount > (proj.budget - (proj.spent || 0))) return;
+
+    const expense = {
+      id: Date.now(), type: newExpense.type, category: newExpense.category,
+      paidTo: newExpense.paidTo, amount, date: newExpense.date,
+    };
+
+    const updated = projects.map(p => {
+      if (p.id !== Number(newExpense.projectId)) return p;
+      return recalcProject({ ...p, expenses: [...(p.expenses || []), expense] });
+    });
+
+    if (onProjectsChange) onProjectsChange(updated);
+    setNewExpense(EMPTY_EXPENSE);
+    setShowExpenseModal(false);
   };
+
+  // ── Abrir modal de edición ────────────────────────────────────
+  const openEditExpense = (expense) => {
+    setEditingExpense(expense);
+    setEditForm({
+      type:     expense.type,
+      category: expense.category,
+      paidTo:   expense.paidTo || '',
+      amount:   expense.amount,
+      date:     expense.date,
+    });
+    setShowEditModal(true);
+  };
+
+  // ── Guardar edición de gasto ──────────────────────────────────
+  const handleSaveEdit = () => {
+    if (!editForm.type || !editForm.amount || !editForm.date) return;
+    const amount = Number(editForm.amount) || 0;
+    if (exceedsOnEdit) return; // Bloquear si supera presupuesto disponible
+
+    const updated = projects.map(p => {
+      if (p.id !== editingExpense.projectId) return p;
+      const updatedExpenses = (p.expenses || []).map(e =>
+        e.id === editingExpense.id
+          ? { ...e, type: editForm.type, category: editForm.category, paidTo: editForm.paidTo, amount, date: editForm.date }
+          : e
+      );
+      return recalcProject({ ...p, expenses: updatedExpenses });
+    });
+
+    if (onProjectsChange) onProjectsChange(updated);
+    setShowEditModal(false);
+    setEditingExpense(null);
+  };
+
+  // ── Eliminar gasto ────────────────────────────────────────────
+  const handleDeleteExpense = (expense) => {
+    if (!window.confirm('¿Eliminar este gasto?')) return;
+    const updated = projects.map(p => {
+      if (p.id !== expense.projectId) return p;
+      return recalcProject({ ...p, expenses: (p.expenses || []).filter(e => e.id !== expense.id) });
+    });
+    if (onProjectsChange) onProjectsChange(updated);
+  };
+
+  const selectedProject    = budgetProjects.find(p => p.id === Number(newExpense.projectId));
+  const selectedRemaining  = selectedProject ? (selectedProject.budget - (selectedProject.spent || 0)) : 0;
+  const newAmountNum       = Number(newExpense.amount) || 0;
+  const exceedsOnNew       = selectedProject && newAmountNum > selectedRemaining;
+
+  // Para edición: el presupuesto disponible es el restante + el monto original del gasto (que será reemplazado)
+  const editProject        = editingExpense ? budgetProjects.find(p => p.id === editingExpense.projectId) : null;
+  const editRemaining      = editProject ? (editProject.budget - (editProject.spent || 0)) + (editingExpense?.amount || 0) : 0;
+  const editAmountNum      = Number(editForm.amount) || 0;
+  const exceedsOnEdit      = editProject && editAmountNum > editRemaining;
 
   return (
     <div className="space-y-6">
-      {/* Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+      {/* ── Resumen global ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { label: 'Presupuesto Total',     value: totalBudget,    icon: DollarSign,  iconColor: 'text-blue-500',  textColor: '#1d1d1b', sub: 'Todos los proyectos', bar: false },
-          { label: 'Gastos Ejecutados',     value: totalSpent,     icon: TrendingDown,iconColor: 'text-red-500',   textColor: '#dc3545', sub: null, bar: true, barPct: (totalSpent/totalBudget)*100, barColor: '#dc3545' },
-          { label: 'Presupuesto Restante',  value: totalRemaining, icon: TrendingUp,  iconColor: 'text-green-500', textColor: '#28a745', sub: `${((totalRemaining/totalBudget)*100).toFixed(1)}% disponible`, bar: false },
-        ].map(({ label, value, icon: Icon, iconColor, textColor, sub, bar, barPct, barColor }) => (
+          { label: 'Presupuesto Total', value: COP(totalBudget), icon: DollarSign,  color: '#17a2b8', bg: '#17a2b820' },
+          { label: 'Total Gastado',     value: COP(totalSpent),  icon: TrendingUp,   color: '#dc3545', bg: '#dc354520' },
+          { label: 'Total Restante',    value: COP(totalLeft),   icon: CheckCircle,  color: '#28a745', bg: '#28a74520' },
+        ].map(({ label, value, icon: Icon, color, bg }) => (
           <div key={label} className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm" style={{ color: '#808080' }}>{label}</h3>
-              <Icon className={iconColor} size={24} />
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: bg }}>
+                <Icon size={20} style={{ color }} />
+              </div>
+              <span className="text-xs font-medium px-2 py-1 rounded-full" style={{ backgroundColor: bg, color }}>
+                {globalPct}% ejecutado
+              </span>
             </div>
-            <p className="text-3xl mb-2" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: textColor }}>
-              {formatCurrency(value)}
-            </p>
-            {bar && <div className="w-full bg-gray-200 rounded-full h-2 mt-2"><div className="h-2 rounded-full transition-all" style={{ width: `${barPct}%`, backgroundColor: barColor }} /></div>}
-            {sub && <p className="text-sm" style={{ color: '#808080' }}>{sub}</p>}
+            <p className="text-xl font-bold" style={{ color: '#1d1d1b' }}>{value}</p>
+            <p className="text-sm mt-1" style={{ color: '#808080' }}>{label}</p>
           </div>
         ))}
       </div>
 
-      {/* Budget by Project */}
+      {/* ── Presupuesto por proyecto ── */}
       <div className="bg-white rounded-xl shadow-lg overflow-hidden">
         <div className="p-6 border-b" style={{ borderColor: '#e0e0e0' }}>
-          <h2 className="text-xl flex items-center gap-2" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#1d1d1b' }}>
-            <PieChart size={24} style={{ color: '#f18517' }} />Presupuesto por Proyecto
+          <h2 className="text-xl" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#1d1d1b' }}>
+            Presupuesto por Proyecto
           </h2>
+          <p className="text-sm mt-1" style={{ color: '#808080' }}>
+            Los proyectos aparecen aquí automáticamente al crearlos con presupuesto asignado.
+          </p>
         </div>
-        <div className="p-6 space-y-4">
-          {projectsBudget.map((project) => {
-            const spentPct = (project.spent / project.totalBudget) * 100;
+        <div className="p-6 space-y-6">
+          {budgetProjects.length === 0 && (
+            <p className="text-center py-10 text-sm" style={{ color: '#808080' }}>
+              No hay proyectos con presupuesto. Crea uno desde la sección <strong>Proyectos</strong>.
+            </p>
+          )}
+          {budgetProjects.map(project => {
+            const spent  = project.spent  || 0;
+            const budget = project.budget || 0;
+            const left   = budget - spent;
+            const pct    = budget > 0 ? Math.min(Math.round((spent / budget) * 100), 100) : 0;
+            const color  = barColor(pct);
             return (
-              <div key={project.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow" style={{ borderColor: '#e0e0e0' }}>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-3">
-                  <h3 className="text-lg" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#1d1d1b' }}>{project.name}</h3>
-                  <span className="text-sm w-fit px-3 py-1 rounded-full" style={{ backgroundColor: spentPct >= 100 ? '#dc354520' : '#28a74520', color: spentPct >= 100 ? '#dc3545' : '#28a745' }}>
-                    {spentPct.toFixed(1)}% ejecutado
+              <div key={project.id} className="border rounded-xl p-5 hover:shadow-md transition-shadow" style={{ borderColor: '#e0e0e0' }}>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+                  <div>
+                    <h3 className="font-medium text-lg" style={{ color: '#1d1d1b' }}>{project.title}</h3>
+                    <p className="text-xs mt-0.5" style={{ color: '#808080' }}>{project.category} · {project.date}</p>
+                  </div>
+                  <span className="text-sm font-medium px-3 py-1 rounded-full w-fit"
+                    style={{ backgroundColor: color + '20', color }}>
+                    {pct}% ejecutado
                   </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-3 text-sm">
-                  <div><span className="block text-xs mb-1" style={{ color: '#808080' }}>Presupuesto Total</span><span className="font-medium" style={{ color: '#1d1d1b' }}>{formatCurrency(project.totalBudget)}</span></div>
-                  <div><span className="block text-xs mb-1" style={{ color: '#808080' }}>Gastado</span><span className="font-medium" style={{ color: '#dc3545' }}>{formatCurrency(project.spent)}</span></div>
-                  <div><span className="block text-xs mb-1" style={{ color: '#808080' }}>Restante</span><span className="font-medium" style={{ color: '#28a745' }}>{formatCurrency(project.remaining)}</span></div>
+                <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden mb-4">
+                  <div className="h-full rounded-full transition-all duration-700"
+                    style={{ width: `${pct}%`, backgroundColor: color }} />
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                  <div className="h-3 rounded-full transition-all duration-500" style={{ width: `${Math.min(spentPct, 100)}%`, backgroundColor: spentPct >= 100 ? '#dc3545' : spentPct >= 75 ? '#ffc107' : '#28a745' }} />
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-xs mb-1" style={{ color: '#808080' }}>Presupuesto Total</p>
+                    <p className="font-semibold" style={{ color: '#1d1d1b' }}>{COP(budget)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs mb-1" style={{ color: '#808080' }}>Gastado</p>
+                    <p className="font-semibold" style={{ color: '#dc3545' }}>{COP(spent)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs mb-1" style={{ color: '#808080' }}>Restante</p>
+                    <p className="font-semibold" style={{ color: left >= 0 ? '#28a745' : '#dc3545' }}>{COP(left)}</p>
+                  </div>
                 </div>
+                {pct >= 100 && (
+                  <div className="mt-3 flex items-center gap-2 text-sm" style={{ color: '#dc3545' }}>
+                    <AlertTriangle size={16} /><span>Presupuesto completamente ejecutado</span>
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* Expenses List */}
+      {/* ── Registro de gastos ── */}
       <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-        <div className="p-6 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-4" style={{ borderColor: '#e0e0e0' }}>
-          <h2 className="text-xl" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#1d1d1b' }}>Registro de Gastos</h2>
-          <button onClick={() => setShowExpenseModal(true)} className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all hover:shadow-lg w-full sm:w-auto" style={{ backgroundColor: '#f18517', color: 'white' }}>
-            <Plus size={20} />Agregar Gasto
+        <div className="p-6 border-b flex items-center justify-between" style={{ borderColor: '#e0e0e0' }}>
+          <h2 className="text-xl" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#1d1d1b' }}>
+            Registro de Gastos
+          </h2>
+          <button onClick={() => setShowExpenseModal(true)} disabled={budgetProjects.length === 0}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg transition-all hover:shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ backgroundColor: '#f18517', color: 'white' }}>
+            <Plus size={20} /> Agregar Gasto
           </button>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead style={{ backgroundColor: '#f5f5f5' }}>
-              <tr>
-                {['Fecha', 'Proyecto', 'Tipo de Gasto', 'Pagado a', 'Categoría', 'Monto'].map((h, i) => (
-                  <th key={h} className={`p-4 text-sm ${i === 5 ? 'text-right' : 'text-left'}`} style={{ color: '#1d1d1b' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {expenses.map((expense) => (
-                <tr key={expense.id} className="border-b hover:bg-gray-50 transition-colors" style={{ borderColor: '#e0e0e0' }}>
-                  <td className="p-4 text-sm" style={{ color: '#808080' }}>{expense.date}</td>
-                  <td className="p-4 text-sm" style={{ color: '#1d1d1b' }}>{expense.projectName}</td>
-                  <td className="p-4 text-sm" style={{ color: '#1d1d1b' }}>{expense.type}</td>
-                  <td className="p-4 text-sm" style={{ color: '#808080' }}>{expense.paidTo}</td>
-                  <td className="p-4">
-                    <span className="px-2 py-1 rounded text-xs" style={{ backgroundColor: getCategoryColor(expense.category) + '20', color: getCategoryColor(expense.category) }}>
-                      {getCategoryLabel(expense.category)}
-                    </span>
-                  </td>
-                  <td className="p-4 text-sm text-right font-medium" style={{ color: '#dc3545' }}>{formatCurrency(expense.amount)}</td>
+          {allExpenses.length === 0 ? (
+            <p className="text-center py-10 text-sm" style={{ color: '#808080' }}>No hay gastos registrados aún.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ backgroundColor: '#f5f5f5' }}>
+                  {['Fecha', 'Proyecto', 'Tipo de Gasto', 'Pagado a', 'Categoría', 'Monto', 'Acciones'].map(h => (
+                    <th key={h} className="text-left px-4 py-3 font-medium" style={{ color: '#1d1d1b' }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {allExpenses.map(expense => {
+                  const cs = CATEGORY_STYLE[expense.category] || CATEGORY_STYLE.Otros;
+                  return (
+                    <tr key={expense.id} className="border-t hover:bg-gray-50 transition-colors" style={{ borderColor: '#e0e0e0' }}>
+                      <td className="px-4 py-3" style={{ color: '#808080' }}>{expense.date}</td>
+                      <td className="px-4 py-3" style={{ color: '#1d1d1b' }}>{expense.projectTitle}</td>
+                      <td className="px-4 py-3" style={{ color: '#1d1d1b' }}>{expense.type}</td>
+                      <td className="px-4 py-3" style={{ color: '#808080' }}>{expense.paidTo || '—'}</td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-1 rounded-full text-xs font-medium"
+                          style={{ backgroundColor: cs.bg, color: cs.color }}>
+                          {expense.category}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-medium" style={{ color: '#dc3545' }}>{COP(expense.amount)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => openEditExpense(expense)}
+                            className="p-1.5 rounded hover:bg-blue-50 transition-colors" title="Editar gasto"
+                            style={{ color: '#17a2b8' }}>
+                            <Edit2 size={15} />
+                          </button>
+                          <button onClick={() => handleDeleteExpense(expense)}
+                            className="p-1.5 rounded hover:bg-red-50 transition-colors" title="Eliminar gasto"
+                            style={{ color: '#dc3545' }}>
+                            <X size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
-      {/* Add Expense Modal */}
+      {/* ══ MODAL: Nuevo Gasto ══════════════════════════════════════ */}
       {showExpenseModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}>
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#1d1d1b' }}>Registrar Nuevo Gasto</h3>
-              <button onClick={() => { setShowExpenseModal(false); setNewExpense({}); }} className="p-2 hover:bg-gray-100 rounded-lg transition-colors" style={{ color: '#808080' }}>
-                <X size={24} />
-              </button>
+              <h3 className="text-xl" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#1d1d1b' }}>
+                Registrar Nuevo Gasto
+              </h3>
+              <button onClick={() => { setShowExpenseModal(false); setNewExpense(EMPTY_EXPENSE); }}
+                className="p-2 hover:bg-gray-100 rounded-lg" style={{ color: '#808080' }}><X size={24} /></button>
             </div>
+
             <div className="space-y-4">
               <div>
-                <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Proyecto</label>
-                <select value={newExpense.projectId || ''} onChange={(e) => setNewExpense({ ...newExpense, projectId: Number(e.target.value) })}
-                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2" style={{ borderColor: '#e0e0e0' }}>
+                <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Proyecto *</label>
+                <select value={newExpense.projectId} onChange={e => setNewExpense({ ...newExpense, projectId: e.target.value })}
+                  className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2" style={{ borderColor: '#e0e0e0' }}>
                   <option value="">Selecciona un proyecto</option>
-                  {projectsBudget.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  {budgetProjects.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.title} — Restante: {COP((p.budget || 0) - (p.spent || 0))}
+                    </option>
+                  ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Tipo de Gasto</label>
-                <input type="text" value={newExpense.type || ''} onChange={(e) => setNewExpense({ ...newExpense, type: e.target.value })}
-                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2" style={{ borderColor: '#e0e0e0' }}
-                  placeholder="Ej: Alquiler de equipos, Materiales, etc." />
-              </div>
+
+              {selectedProject && selectedProject.budget <= selectedProject.spent && (
+                <div className="p-3 rounded-lg flex items-center gap-2 text-sm" style={{ backgroundColor: '#f8d7da', color: '#721c24' }}>
+                  <AlertTriangle size={16} />Este proyecto ya agotó su presupuesto. No se pueden registrar más gastos.
+                </div>
+              )}
+
+              {selectedProject && selectedProject.budget > selectedProject.spent && (
+                <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: '#f0f9f0', color: '#28a745' }}>
+                  💰 Disponible: <strong>{COP(selectedRemaining)}</strong>
+                </div>
+              )}
+
+              {exceedsOnNew && (
+                <div className="p-3 rounded-lg flex items-center gap-2 text-sm" style={{ backgroundColor: '#f8d7da', color: '#721c24' }}>
+                  <AlertTriangle size={16} />El monto ({COP(newAmountNum)}) supera el presupuesto disponible ({COP(selectedRemaining)}). Redúcelo.
+                </div>
+              )}
+
+              {[
+                { label: 'Tipo de Gasto *', key: 'type',   type: 'text',   placeholder: 'Ej: Alquiler de equipos' },
+                { label: 'Pagado a',        key: 'paidTo', type: 'text',   placeholder: 'Nombre de proveedor o persona' },
+              ].map(({ label, key, type, placeholder }) => (
+                <div key={key}>
+                  <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>{label}</label>
+                  <input type={type} value={newExpense[key]} onChange={e => setNewExpense({ ...newExpense, [key]: e.target.value })}
+                    className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2" style={{ borderColor: '#e0e0e0' }}
+                    placeholder={placeholder} />
+                </div>
+              ))}
+
               <div>
                 <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Categoría</label>
-                <select value={newExpense.category || 'other'} onChange={(e) => setNewExpense({ ...newExpense, category: e.target.value })}
-                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2" style={{ borderColor: '#e0e0e0' }}>
-                  <option value="material">Materiales</option>
-                  <option value="service">Servicios</option>
-                  <option value="personnel">Personal</option>
-                  <option value="transport">Transporte</option>
-                  <option value="other">Otros</option>
+                <select value={newExpense.category} onChange={e => setNewExpense({ ...newExpense, category: e.target.value })}
+                  className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2" style={{ borderColor: '#e0e0e0' }}>
+                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
+
               <div>
-                <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Pagado a</label>
-                <input type="text" value={newExpense.paidTo || ''} onChange={(e) => setNewExpense({ ...newExpense, paidTo: e.target.value })}
-                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2" style={{ borderColor: '#e0e0e0' }}
-                  placeholder="Nombre de proveedor o persona" />
+                <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Monto (COP) *</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-medium text-sm" style={{ color: '#808080' }}>$</span>
+                  <input type="number" min="0" value={newExpense.amount} onChange={e => setNewExpense({ ...newExpense, amount: e.target.value })}
+                    className="w-full pl-8 pr-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2" style={{ borderColor: '#e0e0e0' }}
+                    placeholder="0" />
+                </div>
+                {Number(newExpense.amount) > 0 && <p className="text-xs mt-1" style={{ color: '#808080' }}>{COP(newExpense.amount)}</p>}
               </div>
+
               <div>
-                <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Monto (COP)</label>
-                <input type="number" value={newExpense.amount || ''} onChange={(e) => setNewExpense({ ...newExpense, amount: Number(e.target.value) })}
-                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2" style={{ borderColor: '#e0e0e0' }} placeholder="0" />
+                <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Fecha *</label>
+                <input type="date" value={newExpense.date} onChange={e => setNewExpense({ ...newExpense, date: e.target.value })}
+                  className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2" style={{ borderColor: '#e0e0e0' }} />
               </div>
-              <div>
-                <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Fecha</label>
-                <input type="date" value={newExpense.date || ''} onChange={(e) => setNewExpense({ ...newExpense, date: e.target.value })}
-                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2" style={{ borderColor: '#e0e0e0' }} />
-              </div>
-              <div className="flex gap-2 pt-4">
-                <button onClick={handleAddExpense} className="flex-1 px-4 py-3 rounded-lg hover:shadow-lg transition-all" style={{ backgroundColor: '#f18517', color: 'white' }}>Registrar Gasto</button>
-                <button onClick={() => { setShowExpenseModal(false); setNewExpense({}); }} className="px-4 py-3 rounded-lg border hover:bg-gray-50 transition-colors" style={{ borderColor: '#e0e0e0', color: '#808080' }}>Cancelar</button>
+
+              <div className="flex gap-3 pt-2">
+                <button onClick={handleAddExpense}
+                  disabled={!newExpense.projectId || !newExpense.type || !newExpense.amount || !newExpense.date || exceedsOnNew || (selectedProject && selectedProject.budget <= selectedProject.spent)}
+                  className="flex-1 py-3 rounded-lg font-medium hover:shadow-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: '#f18517', color: 'white' }}>Registrar Gasto</button>
+                <button onClick={() => { setShowExpenseModal(false); setNewExpense(EMPTY_EXPENSE); }}
+                  className="px-4 py-3 rounded-lg border hover:bg-gray-50 transition-colors"
+                  style={{ borderColor: '#e0e0e0', color: '#808080' }}>Cancelar</button>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* ══ MODAL: Editar Gasto ══════════════════════════════════════ */}
+      {showEditModal && editingExpense && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#1d1d1b' }}>
+                Editar Gasto
+              </h3>
+              <button onClick={() => { setShowEditModal(false); setEditingExpense(null); }}
+                className="p-2 hover:bg-gray-100 rounded-lg" style={{ color: '#808080' }}><X size={24} /></button>
+            </div>
+
+            {/* Proyecto (solo lectura) */}
+            <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: '#f5f5f5' }}>
+              <p className="text-xs mb-0.5" style={{ color: '#808080' }}>Proyecto</p>
+              <p className="font-medium text-sm" style={{ color: '#1d1d1b' }}>{editingExpense.projectTitle}</p>
+            </div>
+
+            <div className="space-y-4">
+              {[
+                { label: 'Tipo de Gasto *', key: 'type',   type: 'text', placeholder: 'Ej: Alquiler de equipos' },
+                { label: 'Pagado a',        key: 'paidTo', type: 'text', placeholder: 'Nombre de proveedor o persona' },
+              ].map(({ label, key, type, placeholder }) => (
+                <div key={key}>
+                  <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>{label}</label>
+                  <input type={type} value={editForm[key]} onChange={e => setEditForm({ ...editForm, [key]: e.target.value })}
+                    className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2" style={{ borderColor: '#e0e0e0' }}
+                    placeholder={placeholder} />
+                </div>
+              ))}
+
+              <div>
+                <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Categoría</label>
+                <select value={editForm.category} onChange={e => setEditForm({ ...editForm, category: e.target.value })}
+                  className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2" style={{ borderColor: '#e0e0e0' }}>
+                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Monto (COP) *</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-medium text-sm" style={{ color: '#808080' }}>$</span>
+                  <input type="number" min="0" value={editForm.amount} onChange={e => setEditForm({ ...editForm, amount: e.target.value })}
+                    className="w-full pl-8 pr-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2" style={{ borderColor: exceedsOnEdit ? '#dc3545' : '#e0e0e0' }} />
+                </div>
+                {Number(editForm.amount) > 0 && <p className="text-xs mt-1" style={{ color: '#808080' }}>{COP(editForm.amount)}</p>}
+                {editProject && (
+                  <p className="text-xs mt-1" style={{ color: '#808080' }}>
+                    Disponible para este gasto: <strong style={{ color: exceedsOnEdit ? '#dc3545' : '#28a745' }}>{COP(editRemaining)}</strong>
+                  </p>
+                )}
+                {exceedsOnEdit && (
+                  <div className="mt-2 p-2 rounded-lg flex items-center gap-2 text-xs" style={{ backgroundColor: '#f8d7da', color: '#721c24' }}>
+                    <AlertTriangle size={14} />El monto supera el presupuesto disponible para este proyecto.
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Fecha *</label>
+                <input type="date" value={editForm.date} onChange={e => setEditForm({ ...editForm, date: e.target.value })}
+                  className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2" style={{ borderColor: '#e0e0e0' }} />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button onClick={handleSaveEdit} disabled={!editForm.type || !editForm.amount || !editForm.date || exceedsOnEdit}
+                  className="flex-1 py-3 rounded-lg font-medium hover:shadow-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  style={{ backgroundColor: '#28a745', color: 'white' }}>
+                  <Save size={18} />Guardar Cambios
+                </button>
+                <button onClick={() => { setShowEditModal(false); setEditingExpense(null); }}
+                  className="px-4 py-3 rounded-lg border hover:bg-gray-50 transition-colors"
+                  style={{ borderColor: '#e0e0e0', color: '#808080' }}>Cancelar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

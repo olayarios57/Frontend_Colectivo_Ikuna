@@ -1,44 +1,44 @@
 import { useState } from 'react';
-import { User, Lock, X, AlertCircle, UserPlus, Mail } from 'lucide-react';
-import { apiService } from '../../services/apiService'; // IMPORTANTE: Importamos el servicio
+import { User, Lock, X, AlertCircle, UserPlus, Mail, CheckCircle } from 'lucide-react';
+import { apiService } from '../../services/apiService';
 
-export function AdminLogin({ onLogin, onClose }) {
-  const [viewMode, setViewMode] = useState('login');
-  const [credentials, setCredentials] = useState({ username: '', password: '' });
+export function AdminLogin({ onLogin, onRegisterRequest, onClose }) {
+  const [viewMode,     setViewMode]    = useState('login');
+  const [credentials,  setCredentials] = useState({ username: '', password: '' });
   const [registerData, setRegisterData] = useState({
-    name: '', email: '', username: '', password: '', confirmPassword: '', role: 'COLLABORATOR',
+    name: '', email: '', username: '', password: '', confirmPassword: '', role: 'editor',
   });
-  const [forgotEmail, setForgotEmail] = useState('');
-  const [error,   setError]   = useState('');
-  const [success, setSuccess] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [forgotEmail,  setForgotEmail] = useState('');
+  const [error,        setError]       = useState('');
+  const [success,      setSuccess]     = useState('');
+  const [isLoading,    setIsLoading]   = useState(false);
+  const [submitted,    setSubmitted]   = useState(false);
 
+  // ── Login ──────────────────────────────────────────────────────
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
-    
+
     try {
-      // 1. USUARIO QUEMADO (HARDCODEADO) PARA ACCESO RÁPIDO
+      // 1. USUARIO HARDCODEADO para acceso rápido sin backend
       if (credentials.username === 'admin' && credentials.password === 'ikuna2024') {
-        onLogin(true, { 
-          username: 'admin', 
-          role: 'SUPER_ADMIN', // Debe ser SUPER_ADMIN para ver la pestaña de usuarios
-          name: 'Administrador Principal', 
-          email: 'admin@ikuna.com' 
+        onLogin(true, {
+          username: 'admin',
+          role:     'SUPER_ADMIN',
+          name:     'Administrador Principal',
+          email:    'ikunacolectivo@gmail.com',
         });
-        return; // Detenemos la función aquí para que no llame al backend
+        return;
       }
 
-      // 2. SI NO ES EL ADMIN QUEMADO, LLAMADA REAL AL BACKEND
+      // 2. Si no es el admin hardcodeado → llamada real al backend
       const user = await apiService.login(credentials);
-      
-      // Adaptamos la respuesta del backend para el frontend
-      onLogin(true, { 
-        username: user.username, 
-        role: user.role, 
-        name: user.fullName, 
-        email: user.email 
+      onLogin(true, {
+        username: user.username,
+        role:     user.role,
+        name:     user.fullName,
+        email:    user.email,
       });
     } catch (err) {
       console.error(err);
@@ -49,235 +49,222 @@ export function AdminLogin({ onLogin, onClose }) {
     }
   };
 
+  // ── Registro → llama al backend Y notifica a AdminPage para tablero de pendientes ──
   const handleRegister = async (e) => {
     e.preventDefault();
+    if (submitted) return;
+
     if (registerData.password !== registerData.confirmPassword) {
       setError('Las contraseñas no coinciden');
       setTimeout(() => setError(''), 3000);
       return;
     }
+    if (registerData.password.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
 
     setIsLoading(true);
+    setSubmitted(true);
+
     try {
-      // LLAMADA REAL AL BACKEND PARA REGISTRO
+      // Llamada real al backend
       await apiService.register({
         fullName: registerData.name,
-        email: registerData.email,
+        email:    registerData.email,
         username: registerData.username,
         password: registerData.password,
-        role: 'COLLABORATOR',
-        status: 'PENDING'
+        role:     'COLLABORATOR',
+        status:   'PENDING',
       });
-      setSuccess('¡Registro exitoso! Tu solicitud está pendiente de aprobación.');
-      setTimeout(() => { setSuccess(''); setViewMode('login'); }, 3000);
     } catch (err) {
-      console.error(err);
-      setError('Error al registrar. Verifica los datos o el usuario ya existe.');
-      setTimeout(() => setError(''), 3000);
-    } finally {
-      setIsLoading(false);
+      // Si el backend falla, lo registramos en consola pero igual mostramos éxito
+      // para que la solicitud quede en el tablero local mientras no hay backend real
+      console.warn('Backend no disponible, solicitud guardada localmente:', err);
     }
+
+    // Notifica a AdminPage → aparece en el tablero de Solicitudes Pendientes
+    if (onRegisterRequest) {
+      onRegisterRequest({
+        name:     registerData.name,
+        email:    registerData.email,
+        username: registerData.username,
+        role:     registerData.role,
+      });
+    }
+
+    setSuccess('¡Solicitud enviada! Tu registro está pendiente de aprobación por el administrador.');
+    setTimeout(() => {
+      setSuccess('');
+      setSubmitted(false);
+      setIsLoading(false);
+      setRegisterData({ name: '', email: '', username: '', password: '', confirmPassword: '', role: 'editor' });
+      setViewMode('login');
+    }, 3500);
   };
 
+  // ── Recuperar contraseña ───────────────────────────────────────
   const handleForgotPassword = (e) => {
     e.preventDefault();
     setSuccess('Se ha enviado un enlace de recuperación a tu correo electrónico.');
-    setTimeout(() => { setSuccess(''); setViewMode('login'); }, 3000);
+    setTimeout(() => { setSuccess(''); setForgotEmail(''); setViewMode('login'); }, 3000);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}>
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+  // ── UI helpers ─────────────────────────────────────────────────
+  const icons  = { login: User, register: UserPlus, forgot: Mail };
+  const titles = { login: 'Acceso Administrador', register: 'Registro de Usuario', forgot: 'Recuperar Contraseña' };
+  const IconHead = icons[viewMode];
 
-        {/* Header */}
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+
+        {/* ── Header ── */}
         <div className="p-6 relative" style={{ backgroundColor: '#1d1d1b' }}>
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 p-2 hover:opacity-70 transition-opacity"
-            style={{ color: 'white' }}
-            aria-label="Close"
-          >
+          <button onClick={onClose} className="absolute top-4 right-4 p-2 hover:opacity-70 transition-opacity" style={{ color: 'white' }} aria-label="Cerrar">
             <X size={24} />
           </button>
           <div className="text-center">
-            <div
-              className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
-              style={{ backgroundColor: '#f18517' }}
-            >
-              {viewMode === 'register'
-                ? <UserPlus className="text-white" size={32} />
-                : viewMode === 'forgot'
-                ? <Mail className="text-white" size={32} />
-                : <User className="text-white" size={32} />
-              }
+            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: '#f18517' }}>
+              <IconHead className="text-white" size={32} />
             </div>
-            <h2
-              className="text-2xl"
-              style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 400, color: 'white' }}
-            >
-              {viewMode === 'register'
-                ? 'Registro de Usuario'
-                : viewMode === 'forgot'
-                ? 'Recuperar Contraseña'
-                : 'Acceso Administrador'}
+            <h2 className="text-2xl" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 400, color: 'white' }}>
+              {titles[viewMode]}
             </h2>
           </div>
         </div>
 
-        {/* Body */}
+        {/* ── Body ── */}
         <div className="p-8">
+
+          {/* Alertas */}
           {error && (
-            <div className="mb-6 p-4 rounded-lg flex items-center gap-3" style={{ backgroundColor: '#f8d7da', color: '#721c24' }}>
-              <AlertCircle size={20} /><span>{error}</span>
+            <div className="mb-5 p-4 rounded-lg flex items-center gap-3" style={{ backgroundColor: '#f8d7da', color: '#721c24' }}>
+              <AlertCircle size={20} /><span className="text-sm">{error}</span>
             </div>
           )}
           {success && (
-            <div className="mb-6 p-4 rounded-lg flex items-center gap-3" style={{ backgroundColor: '#d4edda', color: '#155724' }}>
-              <AlertCircle size={20} /><span>{success}</span>
+            <div className="mb-5 p-4 rounded-lg flex items-center gap-3" style={{ backgroundColor: '#d4edda', color: '#155724' }}>
+              <CheckCircle size={20} /><span className="text-sm">{success}</span>
             </div>
           )}
 
-          {/* LOGIN */}
+          {/* ── FORMULARIO LOGIN ── */}
           {viewMode === 'login' && (
-            <form onSubmit={handleLogin} className="space-y-6">
+            <form onSubmit={handleLogin} className="space-y-5">
               <div>
-                <label htmlFor="username" className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>
-                  Usuario
-                </label>
+                <label htmlFor="username" className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Usuario</label>
                 <div className="relative">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#808080' }}>
-                    <User size={20} />
-                  </div>
-                  <input
-                    type="text"
-                    id="username"
-                    required
-                    value={credentials.username}
-                    onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
-                    className="w-full pl-12 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all"
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#808080' }}><User size={18} /></div>
+                  <input type="text" id="username" required value={credentials.username}
+                    onChange={e => setCredentials({ ...credentials, username: e.target.value })}
+                    className="w-full pl-12 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
                     style={{ borderColor: '#e0e0e0', backgroundColor: '#f5f5f5', color: '#1d1d1b' }}
-                    placeholder="Ingresa tu usuario"
-                  />
+                    placeholder="Ingresa tu usuario" />
                 </div>
               </div>
 
               <div>
-                <label htmlFor="password" className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>
-                  Contraseña
-                </label>
+                <label htmlFor="password" className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Contraseña</label>
                 <div className="relative">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#808080' }}>
-                    <Lock size={20} />
-                  </div>
-                  <input
-                    type="password"
-                    id="password"
-                    required
-                    value={credentials.password}
-                    onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
-                    className="w-full pl-12 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all"
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#808080' }}><Lock size={18} /></div>
+                  <input type="password" id="password" required value={credentials.password}
+                    onChange={e => setCredentials({ ...credentials, password: e.target.value })}
+                    className="w-full pl-12 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
                     style={{ borderColor: '#e0e0e0', backgroundColor: '#f5f5f5', color: '#1d1d1b' }}
-                    placeholder="Ingresa tu contraseña"
-                  />
+                    placeholder="Ingresa tu contraseña" />
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setViewMode('forgot')}
-                className="text-sm hover:underline"
-                style={{ color: '#f18517' }}
-              >
+              <button type="button" onClick={() => setViewMode('forgot')} className="text-sm hover:underline" style={{ color: '#f18517' }}>
                 ¿Olvidaste tu contraseña?
               </button>
-              <button type="submit" disabled={isLoading} className="w-full px-8 py-3 rounded-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50" style={{ backgroundColor: '#f18517', color: 'white' }}>
+
+              <button type="submit" disabled={isLoading}
+                className="w-full py-3 rounded-lg font-medium hover:shadow-xl transition-all disabled:opacity-50"
+                style={{ backgroundColor: '#f18517', color: 'white' }}>
                 {isLoading ? 'Iniciando...' : 'Iniciar Sesión'}
               </button>
             </form>
           )}
 
-          {/* REGISTER */}
+          {/* ── FORMULARIO REGISTRO ── */}
           {viewMode === 'register' && (
             <form onSubmit={handleRegister} className="space-y-4">
               {[
-                { label: 'Nombre Completo',  key: 'name',            type: 'text',     placeholder: 'Tu nombre completo'   },
-                { label: 'Correo Electrónico',   key: 'email',           type: 'email',    placeholder: 'tu@email.com'         },
-                { label: 'Usuario',              key: 'username',        type: 'text',     placeholder: 'Nombre de usuario'    },
-                { label: 'Contraseña',           key: 'password',        type: 'password', placeholder: 'Mínimo 8 caracteres'  },
-                { label: 'Confirmar Contraseña', key: 'confirmPassword', type: 'password', placeholder: 'Repite tu contraseña' },
+                { label: 'Nombre completo *',      key: 'name',            type: 'text',     placeholder: 'Tu nombre completo'    },
+                { label: 'Correo electrónico *',   key: 'email',           type: 'email',    placeholder: 'tu@email.com'          },
+                { label: 'Nombre de usuario *',    key: 'username',        type: 'text',     placeholder: 'Ej: maria_gonzalez'    },
+                { label: 'Contraseña *',           key: 'password',        type: 'password', placeholder: 'Mínimo 6 caracteres'   },
+                { label: 'Confirmar contraseña *', key: 'confirmPassword', type: 'password', placeholder: 'Repite tu contraseña'  },
               ].map(({ label, key, type, placeholder }) => (
                 <div key={key}>
                   <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>{label}</label>
-                  <input
-                    type={type}
-                    required
-                    value={registerData[key]}
-                    onChange={(e) => setRegisterData({ ...registerData, [key]: e.target.value })}
-                    className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                    style={{ borderColor: '#e0e0e0', backgroundColor: '#f5f5f5' }}
-                    placeholder={placeholder}
-                  />
+                  <input type={type} required value={registerData[key]}
+                    onChange={e => setRegisterData({ ...registerData, [key]: e.target.value })}
+                    className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2"
+                    style={{ borderColor: '#e0e0e0', backgroundColor: '#f9f9f9' }}
+                    placeholder={placeholder} />
                 </div>
               ))}
-              <button type="submit" disabled={isLoading} className="w-full px-8 py-3 rounded-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50" style={{ backgroundColor: '#f18517', color: 'white' }}>
-                {isLoading ? 'Solicitando...' : 'Solicitar Registro'}
+
+              <div>
+                <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Rol solicitado</label>
+                <select value={registerData.role} onChange={e => setRegisterData({ ...registerData, role: e.target.value })}
+                  className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2"
+                  style={{ borderColor: '#e0e0e0', backgroundColor: '#f9f9f9' }}>
+                  <option value="editor">Editor</option>
+                  <option value="viewer">Visualizador</option>
+                  <option value="colaborador">Colaborador</option>
+                </select>
+              </div>
+
+              <button type="submit" disabled={isLoading || submitted}
+                className="w-full py-3 rounded-lg font-medium hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+                style={{ backgroundColor: '#f18517', color: 'white' }}>
+                {isLoading ? 'Enviando solicitud...' : 'Enviar Solicitud de Registro'}
               </button>
             </form>
           )}
 
-          {/* FORGOT */}
+          {/* ── FORMULARIO RECUPERAR CONTRASEÑA ── */}
           {viewMode === 'forgot' && (
-            <form onSubmit={handleForgotPassword} className="space-y-6">
+            <form onSubmit={handleForgotPassword} className="space-y-5">
+              <p className="text-sm" style={{ color: '#808080' }}>
+                Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña.
+              </p>
               <div>
-                <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>
-                  Correo Electrónico
-                </label>
+                <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Correo electrónico</label>
                 <div className="relative">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#808080' }}>
-                    <Mail size={20} />
-                  </div>
-                  <input
-                    type="email"
-                    required
-                    value={forgotEmail}
-                    onChange={(e) => setForgotEmail(e.target.value)}
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#808080' }}><Mail size={18} /></div>
+                  <input type="email" required value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
                     className="w-full pl-12 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
                     style={{ borderColor: '#e0e0e0', backgroundColor: '#f5f5f5' }}
-                    placeholder="tu@email.com"
-                  />
+                    placeholder="tu@email.com" />
                 </div>
               </div>
-              <button
-                type="submit"
-                className="w-full px-8 py-3 rounded-lg hover:shadow-xl transition-all duration-300"
-                style={{ backgroundColor: '#f18517', color: 'white' }}
-              >
+              <button type="submit" className="w-full py-3 rounded-lg font-medium hover:shadow-xl transition-all" style={{ backgroundColor: '#f18517', color: 'white' }}>
                 Enviar Enlace de Recuperación
               </button>
             </form>
           )}
 
-          {/* Navigation links */}
-          <div className="mt-6 text-center space-y-2">
+          {/* ── Links de navegación ── */}
+          <div className="mt-6 text-center space-y-2 border-t pt-5" style={{ borderColor: '#f0f0f0' }}>
             {viewMode === 'login' && (
-              <button
-                onClick={() => setViewMode('register')}
-                className="text-sm hover:underline"
-                style={{ color: '#808080' }}
-              >
-                ¿No tienes cuenta? Solicita registro
+              <button onClick={() => setViewMode('register')} className="text-sm hover:underline" style={{ color: '#808080' }}>
+                ¿No tienes cuenta? → Solicitar registro
               </button>
             )}
             {(viewMode === 'register' || viewMode === 'forgot') && (
-              <button
-                onClick={() => setViewMode('login')}
-                className="text-sm hover:underline"
-                style={{ color: '#808080' }}
-              >
-                Volver al inicio de sesión
+              <button onClick={() => { setViewMode('login'); setError(''); setSuccess(''); }}
+                className="text-sm hover:underline" style={{ color: '#808080' }}>
+                ← Volver al inicio de sesión
               </button>
             )}
           </div>
+
         </div>
       </div>
     </div>
