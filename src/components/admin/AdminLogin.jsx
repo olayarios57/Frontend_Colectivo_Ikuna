@@ -49,7 +49,7 @@ export function AdminLogin({ onLogin, onRegisterRequest, onClose }) {
     }
   };
 
-  // ── Registro → llama al backend Y notifica a AdminPage para tablero de pendientes ──
+  // ── Registro → Llama al backend y respeta las validaciones ──
   const handleRegister = async (e) => {
     e.preventDefault();
     if (submitted) return;
@@ -59,49 +59,67 @@ export function AdminLogin({ onLogin, onRegisterRequest, onClose }) {
       setTimeout(() => setError(''), 3000);
       return;
     }
-    if (registerData.password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
+    
+    // CORRECCIÓN: El backend exige mínimo 8 caracteres
+    if (registerData.password.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres');
       setTimeout(() => setError(''), 3000);
       return;
     }
 
     setIsLoading(true);
-    setSubmitted(true);
 
     try {
       // Llamada real al backend
       await apiService.register({
-        fullName: registerData.name,
+        fullName: registerData.name, // El backend mapea esto a fullName
         email:    registerData.email,
         username: registerData.username,
         password: registerData.password,
-        role:     'COLLABORATOR',
+        role:     registerData.role.toUpperCase(), // Aseguramos que llegue en mayúscula
         status:   'PENDING',
       });
+
+      // Si el código llega aquí, es porque el BACKEND SÍ GUARDÓ en la base de datos
+      setSuccess('¡Solicitud enviada! Tu registro está pendiente de aprobación por el administrador.');
+      setSubmitted(true);
+      
+      // Notifica a AdminPage si es necesario localmente
+      if (onRegisterRequest) {
+        onRegisterRequest({
+          name:     registerData.name,
+          email:    registerData.email,
+          username: registerData.username,
+          role:     registerData.role,
+        });
+      }
+
+      setTimeout(() => {
+        setSuccess('');
+        setSubmitted(false);
+        setIsLoading(false);
+        setRegisterData({ name: '', email: '', username: '', password: '', confirmPassword: '', role: 'editor' });
+        setViewMode('login');
+      }, 3500);
+
     } catch (err) {
-      // Si el backend falla, lo registramos en consola pero igual mostramos éxito
-      // para que la solicitud quede en el tablero local mientras no hay backend real
-      console.warn('Backend no disponible, solicitud guardada localmente:', err);
-    }
-
-    // Notifica a AdminPage → aparece en el tablero de Solicitudes Pendientes
-    if (onRegisterRequest) {
-      onRegisterRequest({
-        name:     registerData.name,
-        email:    registerData.email,
-        username: registerData.username,
-        role:     registerData.role,
-      });
-    }
-
-    setSuccess('¡Solicitud enviada! Tu registro está pendiente de aprobación por el administrador.');
-    setTimeout(() => {
-      setSuccess('');
-      setSubmitted(false);
+      // CORRECCIÓN: Si el backend rechaza el registro, mostramos el error
       setIsLoading(false);
-      setRegisterData({ name: '', email: '', username: '', password: '', confirmPassword: '', role: 'editor' });
-      setViewMode('login');
-    }, 3500);
+      console.error('Error del backend:', err);
+      
+      // Intentamos extraer el mensaje de error exacto que manda Spring Boot
+      let errorMsg = 'Error al registrar. Verifica los datos o el usuario ya existe.';
+      if (err.response && err.response.data) {
+        // Tu GlobalExceptionHandler devuelve un mapa con los errores (ej: { "password": "La contraseña debe tener al menos 8 caracteres" })
+        const backendErrors = Object.values(err.response.data);
+        if (backendErrors.length > 0) {
+          errorMsg = backendErrors[0]; // Mostramos el primer error que mande el backend
+        }
+      }
+      
+      setError(errorMsg);
+      setTimeout(() => setError(''), 5000);
+    }
   };
 
   // ── Recuperar contraseña ───────────────────────────────────────
@@ -196,7 +214,7 @@ export function AdminLogin({ onLogin, onRegisterRequest, onClose }) {
                 { label: 'Nombre completo *',      key: 'name',            type: 'text',     placeholder: 'Tu nombre completo'    },
                 { label: 'Correo electrónico *',   key: 'email',           type: 'email',    placeholder: 'tu@email.com'          },
                 { label: 'Nombre de usuario *',    key: 'username',        type: 'text',     placeholder: 'Ej: maria_gonzalez'    },
-                { label: 'Contraseña *',           key: 'password',        type: 'password', placeholder: 'Mínimo 6 caracteres'   },
+                { label: 'Contraseña *',           key: 'password',        type: 'password', placeholder: 'Mínimo 8 caracteres'   },
                 { label: 'Confirmar contraseña *', key: 'confirmPassword', type: 'password', placeholder: 'Repite tu contraseña'  },
               ].map(({ label, key, type, placeholder }) => (
                 <div key={key}>
