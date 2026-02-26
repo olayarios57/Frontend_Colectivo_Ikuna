@@ -53,5 +53,28 @@ export const apiService = {
     createBudget: async (budgetData) => {
         const response = await clientAxios.post('/budgets/budgets', budgetData);
         return response.data;
+    },
+
+    disableUser: async (id) => {
+        const response = await clientAxios.patch(`/admin/users/${id}/disable`);
+        return response.data;
+    },
+    enableUser: async (id) => {
+        const response = await clientAxios.patch(`/admin/users/${id}/enable`);
+        return response.data;
+    },
+    deleteUser: async (id) => {
+        const response = await clientAxios.delete(`/admin/users/${id}`);
+        return response.data;
+    },
+
+    // --- PERFIL ---
+    updateProfile: async (id, profileData) => {
+        const response = await clientAxios.put(`/admin/users/${id}/profile`, profileData);
+        return response.data;
+    },
+    changePassword: async (id, passwordData) => {
+        const response = await clientAxios.put(`/admin/users/${id}/password`, passwordData);
+        return response.data;
     }
 };
