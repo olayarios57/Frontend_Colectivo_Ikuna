@@ -48,5 +48,10 @@ export const apiService = {
     getBudgetsByProject: async (projectId) => {
         const response = await clientAxios.get(`/budgets/project/${projectId}`);
         return response.data;
+    },
+    // 👇 AGREGA ESTA NUEVA FUNCIÓN 👇
+    createBudget: async (budgetData) => {
+        const response = await clientAxios.post('/budgets/budgets', budgetData);
+        return response.data;
     }
 };

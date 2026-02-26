@@ -68,19 +68,25 @@ const Icon = {
 };
 
 // ── Normaliza cualquier proyecto (local o del backend) a campos canónicos ────
-// El backend puede devolver totalBudget/executedBudget en lugar de budget/spent.
-// Esta función garantiza que SIEMPRE existan los campos que usan BudgetManagement
-// y ProjectManagement, sin importar qué variante devuelva el servidor.
 function normalizeProject(p) {
   const budget = Number(p.budget ?? p.totalBudget ?? 0)  || 0;
   const spent  = Number(p.spent  ?? p.executedBudget ?? 0) || 0;
   const progress = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
+  
+  // ¡AQUÍ ESTÁ LA MAGIA! Transformamos los gastos que llegan del backend a lo que usa tu frontend
+  const normalizedExpenses = (p.expenses || []).map(e => ({
+      ...e,
+      id: e.budgetId || e.id,
+      date: e.startDate || e.date,
+      // concept, notes, paidTo ya vienen con el mismo nombre si aplicaste los pasos anteriores
+  }));
+
   return {
     ...p,
     budget,
     spent,
     progress,
-    expenses:    Array.isArray(p.expenses)    ? p.expenses    : [],
+    expenses:    normalizedExpenses,
     teamMembers: Array.isArray(p.teamMembers) ? p.teamMembers : [],
     tasks:       Array.isArray(p.tasks)       ? p.tasks       : [],
   };
@@ -123,7 +129,7 @@ export function AdminDashboard({ onLogout, userData, pendingUsers, onPendingUser
   const getLabel = s => STATUS_LABEL[s] || s;
 
   const stats = [
-    { label:'Total Proyectos',       value: projects.length,                                                               color:'#f18517' },
+    { label:'Total Proyectos',       value: projects.length,                                                     color:'#f18517' },
     { label:'Completados',           value: projects.filter(p=>p.status==='completed').length,                             color:'#28a745' },
     { label:'En Progreso',           value: projects.filter(p=>p.status==='in-progress').length,                           color:'#ffc107' },
     { label:'Próximos / Pendientes', value: projects.filter(p=>p.status==='upcoming'||p.status==='pending').length,        color:'#17a2b8' },

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { DollarSign, Plus, TrendingUp, TrendingDown, PieChart, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { DollarSign, Plus, TrendingUp, TrendingDown, PieChart, X, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { apiService } from '../../services/apiService'; // IMPORTAMOS LA API
 
 const EXPENSES_PER_PAGE = 30;
 
@@ -28,6 +29,7 @@ export function BudgetManagement({ projects = [], onProjectsChange }) {
   const [newExpense,  setNewExpense]  = useState({ projectId: '', paidTo: '', amount: '', date: '', concept: 'Logística', notes: '' });
   const [expensePage, setExpensePage] = useState(1);
   const [modalError,  setModalError]  = useState('');
+  const [isSaving,    setIsSaving]    = useState(false);
 
   // ── Acumular todos los gastos de todos los proyectos ──────────────────────
   const allExpenses = useMemo(() =>
@@ -48,14 +50,30 @@ export function BudgetManagement({ projects = [], onProjectsChange }) {
 
   // ── Proyecto seleccionado en el modal ──────────────────────────────────────
   const selectedProject  = projects.find(p => String(p.id) === String(newExpense.projectId));
-  // Blindar contra NaN: normalizar budget y spent antes de calcular
   const selBudget        = Number(selectedProject?.budget ?? selectedProject?.totalBudget ?? 0) || 0;
   const selSpent         = Number(selectedProject?.spent  ?? selectedProject?.executedBudget ?? 0) || 0;
   const projectRemaining = selectedProject ? Math.max(0, selBudget - selSpent) : null;
   const projectIsFull    = selectedProject !== undefined && selBudget > 0 && selSpent >= selBudget;
 
-  // ── Registrar gasto ────────────────────────────────────────────────────────
-  const handleAddExpense = () => {
+  // NUEVO: Función auxiliar para leer los errores del backend
+  const handleBackendError = (err, defaultMessage) => {
+    console.error(err);
+    if (err.response && err.response.data) {
+      const backendErrors = Object.values(err.response.data);
+      if (backendErrors.length > 0 && typeof backendErrors[0] === 'string') {
+        setModalError(backendErrors[0]);
+        return;
+      }
+      if (err.response.data.error) {
+        setModalError(err.response.data.error);
+        return;
+      }
+    }
+    setModalError(defaultMessage);
+  };
+
+  // ── Registrar gasto (CONECTADO AL BACKEND) ────────────────────────────────────────────────────────
+  const handleAddExpense = async () => {
     setModalError('');
 
     if (!newExpense.projectId || !newExpense.paidTo || !newExpense.amount || !newExpense.date) {
@@ -71,38 +89,64 @@ export function BudgetManagement({ projects = [], onProjectsChange }) {
       return;
     }
 
-    const expense = {
-      id:        Date.now(),
-      paidTo:    newExpense.paidTo,
-      amount,
-      date:      newExpense.date,
-      concept:   newExpense.concept,
-      notes:     newExpense.notes,
+    setIsSaving(true);
+
+    // Adaptamos el gasto del Front al DTO de Budget del Backend
+    const budgetPayload = {
+      amount: amount,
+      totalIncome: 0,
+      totalExpense: amount,
+      balance: -amount,
+      startDate: newExpense.date,
+      endDate: newExpense.date,
+      status: 'APPROVED',
       projectId: Number(newExpense.projectId),
+      concept: newExpense.concept,
+      paidTo: newExpense.paidTo,
+      notes: newExpense.notes || ''
     };
 
-    // Actualizar el array de proyectos — normalizar budget/spent para evitar NaN
-    const updatedProjects = projects.map(p => {
-      if (String(p.id) !== String(newExpense.projectId)) return p;
-      const pBudget     = Number(p.budget ?? p.totalBudget ?? 0) || 0;
-      const pSpent      = Number(p.spent  ?? p.executedBudget ?? 0) || 0;
-      const newSpent    = pSpent + amount;
-      const newProgress = pBudget > 0 ? Math.min(100, Math.round((newSpent / pBudget) * 100)) : 0;
-      const newStatus   = newProgress >= 100 ? 'completed' : p.status;
-      return {
-        ...p,
-        budget:   pBudget,
-        spent:    newSpent,
-        progress: newProgress,
-        status:   newStatus,
-        expenses: [...(p.expenses || []), expense],
-      };
-    });
+    try {
+      // 1. LLAMADA REAL A LA BASE DE DATOS
+      await apiService.createBudget(budgetPayload);
 
-    onProjectsChange?.(updatedProjects);
-    setNewExpense({ projectId: '', paidTo: '', amount: '', date: '', concept: 'Logística', notes: '' });
-    setShowModal(false);
-    setExpensePage(1);
+      // 2. ACTUALIZAMOS EL ESTADO LOCAL PARA QUE SE VEA EN PANTALLA INMEDIATAMENTE
+      const expense = {
+        id:        Date.now(),
+        paidTo:    newExpense.paidTo,
+        amount,
+        date:      newExpense.date,
+        concept:   newExpense.concept,
+        notes:     newExpense.notes,
+        projectId: Number(newExpense.projectId),
+      };
+
+      const updatedProjects = projects.map(p => {
+        if (String(p.id) !== String(newExpense.projectId)) return p;
+        const pBudget     = Number(p.budget ?? p.totalBudget ?? 0) || 0;
+        const pSpent      = Number(p.spent  ?? p.executedBudget ?? 0) || 0;
+        const newSpent    = pSpent + amount;
+        const newProgress = pBudget > 0 ? Math.min(100, Math.round((newSpent / pBudget) * 100)) : 0;
+        const newStatus   = newProgress >= 100 ? 'completed' : p.status;
+        return {
+          ...p,
+          budget:   pBudget,
+          spent:    newSpent,
+          progress: newProgress,
+          status:   newStatus,
+          expenses: [...(p.expenses || []), expense],
+        };
+      });
+
+      onProjectsChange?.(updatedProjects);
+      closeModal();
+      setExpensePage(1);
+
+    } catch (err) {
+      handleBackendError(err, "Error al guardar el gasto en la base de datos.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const closeModal = () => {
@@ -181,11 +225,6 @@ export function BudgetManagement({ projects = [], onProjectsChange }) {
                     <div className="h-2 rounded-full transition-all duration-500"
                       style={{ width: `${pct}%`, backgroundColor: isFull ? '#dc3545' : '#f18517' }} />
                   </div>
-                  {isFull && (
-                    <p className="text-xs mt-2" style={{ color: '#dc3545' }}>
-                      ⚠ Presupuesto ejecutado al 100%. No se pueden registrar más gastos en este proyecto.
-                    </p>
-                  )}
                 </div>
               );
             })
@@ -299,8 +338,8 @@ export function BudgetManagement({ projects = [], onProjectsChange }) {
             </div>
 
             {modalError && (
-              <div className="mb-4 p-3 rounded-lg text-sm" style={{ backgroundColor: '#f8d7da', color: '#721c24' }}>
-                {modalError}
+              <div className="mb-4 p-3 rounded-lg flex items-center gap-2 text-sm" style={{ backgroundColor: '#f8d7da', color: '#721c24' }}>
+                <AlertCircle size={16} /> {modalError}
               </div>
             )}
 
@@ -325,11 +364,6 @@ export function BudgetManagement({ projects = [], onProjectsChange }) {
                     );
                   })}
                 </select>
-                {projectIsFull && (
-                  <p className="text-xs mt-1" style={{ color: '#dc3545' }}>
-                    Este proyecto ya ejecutó el 100% de su presupuesto.
-                  </p>
-                )}
               </div>
 
               {/* Pagado a */}
@@ -387,10 +421,10 @@ export function BudgetManagement({ projects = [], onProjectsChange }) {
               </div>
 
               <div className="flex gap-2 pt-2">
-                <button onClick={handleAddExpense} disabled={projectIsFull}
+                <button onClick={handleAddExpense} disabled={projectIsFull || isSaving}
                   className="flex-1 px-4 py-3 rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ backgroundColor: '#f18517', color: 'white' }}>
-                  Registrar Gasto
+                  {isSaving ? 'Guardando en BD...' : 'Registrar Gasto'}
                 </button>
                 <button onClick={closeModal}
                   className="px-4 py-3 rounded-lg border hover:bg-gray-50 transition-colors"
