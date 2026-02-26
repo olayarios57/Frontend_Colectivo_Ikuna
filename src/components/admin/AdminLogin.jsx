@@ -3,12 +3,11 @@ import { User, Lock, X, AlertCircle, UserPlus, Mail, CheckCircle, Eye, EyeOff } 
 import { apiService } from '../../services/apiService';
 
 // ── Componente reutilizable para input de contraseña con ojito ──────────────
-// Usa useCallback + onMouseDown preventDefault para evitar pérdida de foco
 function PwInput({ id, value, onChange, placeholder, label }) {
   const [show, setShow] = useState(false);
 
   const toggle = useCallback((e) => {
-    e.preventDefault(); // ← evita que el input pierda el foco
+    e.preventDefault(); 
     setShow(s => !s);
   }, []);
 
@@ -48,7 +47,6 @@ function PwInput({ id, value, onChange, placeholder, label }) {
 }
 
 // ── Componente para campos de contraseña en el formulario de registro ────────
-// Versión simplificada con checkbox "Ver contraseña"
 function PwInputRegister({ id, value, onChange, placeholder, label }) {
   const [show, setShow] = useState(false);
 
@@ -96,6 +94,7 @@ export function AdminLogin({ onLogin, onRegisterRequest, onClose }) {
   const [submitted,    setSubmitted]   = useState(false);
 
   // ── Login ──────────────────────────────────────────────────────────────
+  // ── Login ──────────────────────────────────────────────────────────────
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -105,6 +104,7 @@ export function AdminLogin({ onLogin, onRegisterRequest, onClose }) {
       // 1. Usuario admin hardcodeado
       if (credentials.username === 'admin' && credentials.password === 'ikuna2024') {
         onLogin(true, {
+          id:       0,
           username: 'admin',
           role:     'SUPER_ADMIN',
           name:     'Administrador Principal',
@@ -115,25 +115,37 @@ export function AdminLogin({ onLogin, onRegisterRequest, onClose }) {
 
       // 2. Llamada real al backend
       const user = await apiService.login(credentials);
+      
       // Solo entran usuarios con status ACTIVE
       if (user.status && user.status !== 'ACTIVE') {
-        throw new Error('Usuario inactivo o pendiente de aprobación');
+        throw new Error('Tu cuenta aún no ha sido aprobada por el administrador.');
       }
+      
       onLogin(true, {
+        id:       user.id,
         username: user.username,
         role:     user.role,
         name:     user.fullName,
         email:    user.email,
       });
+      
     } catch (err) {
-      console.error(err);
-      const msg = err.message?.includes('inactivo') || err.message?.includes('pendiente')
-        ? 'Tu cuenta aún no ha sido aprobada por el administrador.'
-        : 'Usuario o contraseña incorrectos';
+      console.error("Error devuelto:", err);
+      
+      let msg = 'Error de conexión con el servidor.'; // Mensaje por defecto
+      
+      // Si el error lo lanzamos nosotros arriba (ej. pendiente de aprobación)
+      if (err.message && err.message.includes('aprobada')) {
+        msg = err.message;
+      } 
+      // Si el error viene de tu backend Java (Ej: "Usuario no encontrado" o "Contraseña incorrecta")
+      else if (err.response && err.response.data && err.response.data.error) {
+        msg = err.response.data.error; 
+      }
+
       setError(msg);
-      // ← Borra automáticamente la contraseña para que el usuario vuelva a ingresarla
-      setCredentials(prev => ({ ...prev, password: '' }));
-      setTimeout(() => setError(''), 4000);
+      setCredentials(prev => ({ ...prev, password: '' })); // Borra la contraseña para volver a intentar
+      setTimeout(() => setError(''), 5000);
     } finally {
       setIsLoading(false);
     }
@@ -206,7 +218,6 @@ export function AdminLogin({ onLogin, onRegisterRequest, onClose }) {
       await apiService.forgotPassword?.(forgotEmail);
       setSuccess('Se ha enviado un enlace de recuperación a tu correo electrónico.');
     } catch {
-      // Si el backend aún no tiene el endpoint, igual mostramos el mensaje
       setSuccess('Si el correo está registrado, recibirás el enlace en breve.');
     } finally {
       setIsLoading(false);

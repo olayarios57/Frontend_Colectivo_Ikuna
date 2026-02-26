@@ -84,6 +84,13 @@ export function ProfileSection({ userData, onUserDataChange }) {
   // ── Guardar info ──────────────────────────────────────────────────────────
   const handleSaveInfo = async e => {
     e.preventDefault();
+    
+    // VALIDACIÓN: Evitar modificar al admin principal quemado en código
+    if (!userData.id || userData.id === 0) {
+      setProfileMsg({ type: 'error', text: 'No se puede modificar el administrador protegido del sistema.' });
+      return;
+    }
+
     setIsSavingInfo(true);
     setProfileMsg({ type: '', text: '' });
     try {
@@ -110,15 +117,27 @@ export function ProfileSection({ userData, onUserDataChange }) {
   const handleSavePw = async e => {
     e.preventDefault();
     setPwMsg({ type: '', text: '' });
+
+    // VALIDACIÓN: Evitar modificar al admin principal quemado en código
+    if (!userData.id || userData.id === 0) {
+      setPwMsg({ type: 'error', text: 'No se puede cambiar la contraseña del administrador protegido.' });
+      return;
+    }
+
     if (pwData.newPw.length < 8) { setPwMsg({ type: 'error', text: 'Mínimo 8 caracteres.' }); return; }
     if (pwData.newPw !== pwData.confirm) { setPwMsg({ type: 'error', text: 'Las contraseñas no coinciden.' }); return; }
+    
     setIsSavingPw(true);
     try {
-      await apiService.changePassword?.(userData.id, { currentPassword: pwData.current, newPassword: pwData.newPw });
+      await apiService.changePassword(userData.id, { 
+        currentPassword: pwData.current, 
+        newPassword: pwData.newPw 
+      });
       setPwData({ current: '', newPw: '', confirm: '' });
       setPwMsg({ type: 'success', text: 'Contraseña actualizada correctamente.' });
-    } catch {
-      setPwMsg({ type: 'error', text: 'Contraseña actual incorrecta o servicio no disponible.' });
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || 'Contraseña actual incorrecta o servicio no disponible.';
+      setPwMsg({ type: 'error', text: errorMessage });
     } finally {
       setIsSavingPw(false);
       setTimeout(() => setPwMsg({ type: '', text: '' }), 4000);
