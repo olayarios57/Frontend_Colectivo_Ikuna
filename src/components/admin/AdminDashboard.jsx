@@ -1,435 +1,557 @@
 import { useState, useEffect } from 'react';
 import {
-  LayoutDashboard, FolderOpen, Settings, LogOut, Menu, X,
-  Plus, Edit, Trash2, FileText, Users as UsersIcon,
-  CheckCircle, XCircle, Calendar as CalendarIcon, Clock, DollarSign,
-  AlertCircle
+  LogOut, Menu, X, Plus, Edit, Trash2,
+  CheckCircle, XCircle, Ban,
 } from 'lucide-react';
 import { ProjectManagement } from './ProjectManagement';
 import { BudgetManagement }  from './BudgetManagement';
+import { ProfileSection }    from './ProfileSection';
 import { apiService }        from '../../services/apiService';
 
-// ─── Usuario administrador principal siempre activo ───────────────
 const INITIAL_ACTIVE = [
   { id: 0, name: 'Administrador Principal', username: 'admin', email: 'ikunacolectivo@gmail.com', role: 'SUPER_ADMIN', status: 'ACTIVE' },
 ];
 
-export function AdminDashboard({ onLogout, userData, pendingUsers, onPendingUsersChange }) {
-  const [activeTab,     setActiveTab]    = useState('dashboard');
-  const [isSidebarOpen, setSidebarOpen]  = useState(false);
-  const [projects,      setProjects]     = useState([]);
-  const [activeUsers,   setActiveUsers]  = useState(INITIAL_ACTIVE);
-  const [isLoading,     setIsLoading]    = useState(true);
+// ── Iconos SVG minimalistas inline ───────────────────────────────────────────
+const Icon = {
+  dashboard: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+      <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+    </svg>
+  ),
+  projects: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 6a2 2 0 012-2h4l2 3h10a2 2 0 012 2v9a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+    </svg>
+  ),
+  calendar: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+      <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+    </svg>
+  ),
+  budget: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9"/><path d="M12 6v2m0 8v2M9.5 9.5A2.5 2.5 0 0112 8a2.5 2.5 0 010 5 2.5 2.5 0 000 5 2.5 2.5 0 002.5-1.5"/>
+    </svg>
+  ),
+  services: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/>
+      <path d="M15.54 8.46a5 5 0 010 7.07M8.46 8.46a5 5 0 000 7.07"/>
+    </svg>
+  ),
+  content: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/>
+    </svg>
+  ),
+  users: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
+    </svg>
+  ),
+  profile: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+    </svg>
+  ),
+  logout: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+    </svg>
+  ),
+};
 
-  // Acepta tanto 'SUPER_ADMIN' (backend) como 'superadmin' (legacy)
+// ── Normaliza cualquier proyecto (local o del backend) a campos canónicos ────
+function normalizeProject(p) {
+  const budget = Number(p.budget ?? p.totalBudget ?? 0)  || 0;
+  const spent  = Number(p.spent  ?? p.executedBudget ?? 0) || 0;
+  const progress = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
+  
+  // ¡AQUÍ ESTÁ LA MAGIA! Transformamos los gastos que llegan del backend a lo que usa tu frontend
+  const normalizedExpenses = (p.expenses || []).map(e => ({
+      ...e,
+      id: e.budgetId || e.id,
+      date: e.startDate || e.date,
+      // concept, notes, paidTo ya vienen con el mismo nombre si aplicaste los pasos anteriores
+  }));
+
+  return {
+    ...p,
+    budget,
+    spent,
+    progress,
+    expenses:    normalizedExpenses,
+    teamMembers: Array.isArray(p.teamMembers) ? p.teamMembers : [],
+    tasks:       Array.isArray(p.tasks)       ? p.tasks       : [],
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+export function AdminDashboard({ onLogout, userData, pendingUsers, onPendingUsersChange }) {
+  const [activeTab,     setActiveTab]   = useState('dashboard');
+  const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [projects,      setProjects]    = useState([]);
+  const [activeUsers,   setActiveUsers] = useState(INITIAL_ACTIVE);
+  const [isLoading,     setIsLoading]   = useState(true);
+  const [currentUser,   setCurrentUser] = useState(userData);
+
   const isSuperAdmin = userData?.role === 'SUPER_ADMIN' || userData?.role === 'superadmin';
 
-  // ── Carga inicial de datos desde el backend ─────────────────────
+  // Wrapper que normaliza antes de guardar en el estado
+  const setNormalizedProjects = (list) => setProjects((list || []).map(normalizeProject));
+
   useEffect(() => {
-    const fetchDashboardData = async () => {
+    const load = async () => {
       try {
         setIsLoading(true);
-        const projectsData = await apiService.getPortfolio();
-        // Normalizar campos para compatibilidad con ProjectManagement y BudgetManagement
-        const normalized = (projectsData || []).map(p => ({
-          ...p,
-          budget:   p.budget   || 0,
-          spent:    p.spent    || 0,
-          expenses: p.expenses || [],
-          teamMembers: p.teamMembers || [],
-          tasks:    p.tasks    || [],
-        }));
-        setProjects(normalized);
-
+        const data = await apiService.getPortfolio();
+        setNormalizedProjects(data || []);
         if (isSuperAdmin) {
-          const pending = await apiService.getPendingUsers();
-          const active  = await apiService.getActiveUsers();
-          if (onPendingUsersChange) onPendingUsersChange(pending || []);
+          const [pending, active] = await Promise.all([apiService.getPendingUsers(), apiService.getActiveUsers()]);
+          onPendingUsersChange?.(pending || []);
           setActiveUsers([...INITIAL_ACTIVE, ...(active || [])]);
         }
-      } catch (error) {
-        console.warn('Backend no disponible, usando datos locales:', error);
-      } finally {
-        setIsLoading(false);
-      }
+      } catch { /* backend no disponible */ }
+      finally { setIsLoading(false); }
     };
-    fetchDashboardData();
+    load();
   }, [isSuperAdmin]); // eslint-disable-line
 
-  // ── Sincronizar proyectos → calendario + presupuesto ───────────
-  const handleProjectsChange = (updated) => setProjects(updated);
+  const STATUS_COLOR = { completed:'#28a745','in-progress':'#ffc107', upcoming:'#17a2b8', pending:'#6c757d' };
+  const STATUS_LABEL = { completed:'Completado','in-progress':'En Progreso', upcoming:'Próximo', pending:'Pendiente' };
+  const getColor = s => STATUS_COLOR[s] || '#808080';
+  const getLabel = s => STATUS_LABEL[s] || s;
 
-  // ── Aprobar usuario: quitar de pendientes → pasar a activos ────
-  const handleApproveUser = async (userId) => {
-    try {
-      await apiService.approveUser(userId);
-    } catch (err) {
-      console.warn('Backend no disponible, aprobando localmente:', err);
-    }
-    const user = (pendingUsers || []).find(u => u.id === userId);
-    if (onPendingUsersChange) onPendingUsersChange((pendingUsers || []).filter(u => u.id !== userId));
-    if (user) setActiveUsers(prev => [...prev, { ...user, status: 'ACTIVE' }]);
-  };
-
-  // ── Rechazar usuario: solo quitar de pendientes ─────────────────
-  const handleRejectUser = async (userId) => {
-    try {
-      await apiService.rejectUser(userId);
-    } catch (err) {
-      console.warn('Backend no disponible, rechazando localmente:', err);
-    }
-    if (onPendingUsersChange) onPendingUsersChange((pendingUsers || []).filter(u => u.id !== userId));
-  };
-
-  // ── Helpers de estado ───────────────────────────────────────────
-  const getStatusColor = (status) => {
-    const c = { completed: '#28a745', 'in-progress': '#ffc107', upcoming: '#17a2b8', pending: '#6c757d' };
-    return c[status] || '#808080';
-  };
-  const getStatusLabel = (status) => {
-    const l = { completed: 'Completado', 'in-progress': 'En Progreso', upcoming: 'Próximo', pending: 'Pendiente' };
-    return l[status] || status;
-  };
-
-  // ── Métricas del dashboard ──────────────────────────────────────
   const stats = [
-    { label: 'Total Proyectos',        value: projects.length,                                                           color: '#f18517' },
-    { label: 'Completados',            value: projects.filter(p => p.status === 'completed').length,                     color: '#28a745' },
-    { label: 'En Progreso',            value: projects.filter(p => p.status === 'in-progress').length,                   color: '#ffc107' },
-    { label: 'Próximos / Pendientes',  value: projects.filter(p => p.status === 'upcoming' || p.status === 'pending').length, color: '#17a2b8' },
+    { label:'Total Proyectos',       value: projects.length,                                                     color:'#f18517' },
+    { label:'Completados',           value: projects.filter(p=>p.status==='completed').length,                             color:'#28a745' },
+    { label:'En Progreso',           value: projects.filter(p=>p.status==='in-progress').length,                           color:'#ffc107' },
+    { label:'Próximos / Pendientes', value: projects.filter(p=>p.status==='upcoming'||p.status==='pending').length,        color:'#17a2b8' },
   ];
+
+  const recentProjects = [...projects]
+    .sort((a,b)=>new Date(b.createdAt||b.date||0)-new Date(a.createdAt||a.date||0))
+    .slice(0,6);
+
+  const approveUser = async (id) => {
+    try { await apiService.approveUser(id); } catch {}
+    const u = (pendingUsers||[]).find(u=>u.id===id);
+    onPendingUsersChange?.((pendingUsers||[]).filter(u=>u.id!==id));
+    if (u) setActiveUsers(prev=>[...prev,{...u,status:'ACTIVE'}]);
+  };
+  const rejectUser  = async (id) => {
+    try { await apiService.rejectUser(id); } catch {}
+    onPendingUsersChange?.((pendingUsers||[]).filter(u=>u.id!==id));
+  };
+  const disableUser = async (id) => {
+    try { await apiService.disableUser?.(id); } catch {}
+    setActiveUsers(prev=>prev.map(u=>u.id===id?{...u,status:'INACTIVE'}:u));
+  };
+  const enableUser  = async (id) => {
+    try { await apiService.enableUser?.(id); } catch {}
+    setActiveUsers(prev=>prev.map(u=>u.id===id?{...u,status:'ACTIVE'}:u));
+  };
+  const deleteUser  = async (id) => {
+    if(!window.confirm('¿Eliminar este usuario permanentemente?')) return;
+    try { await apiService.deleteUser?.(id); } catch {}
+    setActiveUsers(prev=>prev.filter(u=>u.id!==id));
+  };
 
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard',   icon: LayoutDashboard },
-    { id: 'projects',  label: 'Proyectos',   icon: FolderOpen      },
-    { id: 'calendar',  label: 'Calendario',  icon: CalendarIcon    },
-    { id: 'budget',    label: 'Presupuesto', icon: DollarSign      },
-    { id: 'services',  label: 'Servicios',   icon: Settings        },
-    { id: 'content',   label: 'Contenido',   icon: FileText        },
-    ...(isSuperAdmin ? [{ id: 'users', label: 'Usuarios', icon: UsersIcon }] : []),
+    { id:'dashboard', label:'Dashboard',   icon: Icon.dashboard },
+    { id:'projects',  label:'Proyectos',   icon: Icon.projects  },
+    { id:'calendar',  label:'Calendario',  icon: Icon.calendar  },
+    { id:'budget',    label:'Presupuesto', icon: Icon.budget    },
+    { id:'services',  label:'Servicios',   icon: Icon.services  },
+    { id:'content',   label:'Contenido',   icon: Icon.content   },
+    ...(isSuperAdmin?[{id:'users',label:'Usuarios',icon:Icon.users}]:[]),
+    { id:'profile',   label:'Mi Perfil',   icon: Icon.profile   },
   ];
 
-  const services = [
-    { id: 1, name: 'Asesoría Cultural',      active: true },
-    { id: 2, name: 'Creación de Proyectos',  active: true },
-    { id: 3, name: 'Ejecución de Proyectos', active: true },
-  ];
+  const [services] = useState([
+    { id:1, name:'Asesoría Cultural',      active:true },
+    { id:2, name:'Creación de Proyectos',  active:true },
+    { id:3, name:'Ejecución de Proyectos', active:true },
+  ]);
 
-  // ════════════════════════════════════════════════════════════════
+  const COP = v => new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0}).format(v||0);
+
   return (
-    <div className="min-h-screen flex" style={{ backgroundColor: '#f5f5f5' }}>
+    <div className="min-h-screen flex" style={{ backgroundColor:'#f5f5f5' }}>
 
       {/* ── Sidebar ── */}
-      <aside
-        className={`fixed lg:static inset-y-0 left-0 z-40 w-64 transform transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
-        style={{ backgroundColor: '#1d1d1b' }}
-      >
+      <aside className={`fixed lg:static inset-y-0 left-0 z-40 w-60 transform transition-transform duration-300
+        ${isSidebarOpen?'translate-x-0':'-translate-x-full lg:translate-x-0'}`}
+        style={{ backgroundColor:'#1d1d1b' }}>
         <div className="flex flex-col h-full">
 
-          {/* Logo + usuario */}
-          <div className="p-6 border-b" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
-            <h2 className="text-xl" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#f18517' }}>
-              Ikuna Admin
-            </h2>
-            {userData && (
-              <div className="mt-3">
-                <p className="text-sm truncate" style={{ color: 'white' }}>{userData.fullName || userData.name}</p>
-                <span className="inline-block text-xs mt-1 px-2 py-1 rounded" style={{ backgroundColor: '#f18517', color: 'white' }}>
-                  {isSuperAdmin ? 'Super Admin' : 'Administrador'}
-                </span>
+          {/* Cabecera */}
+          <div className="px-5 py-6 border-b" style={{ borderColor:'rgba(255,255,255,0.08)' }}>
+            <p className="text-xs uppercase tracking-widest mb-3" style={{ color:'rgba(255,255,255,0.35)' }}>
+              Panel de control
+            </p>
+            {currentUser && (
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
+                  style={{ backgroundColor:'#f18517' }}>
+                  {currentUser.avatarUrl
+                    ? <img src={currentUser.avatarUrl} alt="" className="w-full h-full object-cover"/>
+                    : <span className="text-white text-xs font-semibold">
+                        {(currentUser.name||'A').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}
+                      </span>
+                  }
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate" style={{ color:'white' }}>{currentUser.name}</p>
+                  <p className="text-xs truncate" style={{ color:'rgba(255,255,255,0.4)' }}>
+                    {isSuperAdmin?'Super Admin':currentUser.role||'Colaborador'}
+                  </p>
+                </div>
               </div>
             )}
           </div>
 
-          {/* Navegación */}
-          <nav className="flex-1 p-4 overflow-y-auto">
-            <ul className="space-y-1">
-              {menuItems.map(({ id, label, icon: Icon }) => (
-                <li key={id}>
-                  <button
-                    onClick={() => { setActiveTab(id); setSidebarOpen(false); }}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all"
-                    style={{
-                      backgroundColor: activeTab === id ? '#f18517' : 'transparent',
-                      color: 'white',
-                    }}
-                  >
-                    <Icon size={20} />
-                    <span>{label}</span>
-                    {/* Badge de pendientes en el menú Usuarios */}
-                    {id === 'users' && (pendingUsers?.length || 0) > 0 && (
-                      <span className="ml-auto text-xs px-1.5 py-0.5 rounded-full font-bold" style={{ backgroundColor: '#dc3545', color: 'white' }}>
-                        {pendingUsers.length}
-                      </span>
-                    )}
-                  </button>
-                </li>
-              ))}
-            </ul>
+          {/* Nav */}
+          <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-0.5">
+            {menuItems.map(({ id, label, icon }) => {
+              const active = activeTab === id;
+              return (
+                <button key={id}
+                  onClick={() => { setActiveTab(id); setSidebarOpen(false); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-sm"
+                  style={{
+                    backgroundColor: active ? '#f18517' : 'transparent',
+                    color: active ? 'white' : 'rgba(255,255,255,0.55)',
+                  }}
+                  onMouseEnter={e => { if(!active) e.currentTarget.style.color='white'; }}
+                  onMouseLeave={e => { if(!active) e.currentTarget.style.color='rgba(255,255,255,0.55)'; }}
+                >
+                  <span className="flex-shrink-0">{icon}</span>
+                  <span className="font-normal">{label}</span>
+                  {id==='users' && (pendingUsers?.length||0)>0 && (
+                    <span className="ml-auto text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold"
+                      style={{ backgroundColor:'#dc3545', color:'white' }}>
+                      {pendingUsers.length}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </nav>
 
           {/* Cerrar sesión */}
-          <div className="p-4 border-t" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
-            <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-all" style={{ color: 'white' }}>
-              <LogOut size={20} /><span>Cerrar Sesión</span>
+          <div className="px-3 py-4 border-t" style={{ borderColor:'rgba(255,255,255,0.08)' }}>
+            <button onClick={onLogout}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all"
+              style={{ color:'rgba(255,255,255,0.45)' }}
+              onMouseEnter={e=>e.currentTarget.style.color='white'}
+              onMouseLeave={e=>e.currentTarget.style.color='rgba(255,255,255,0.45)'}>
+              {Icon.logout}<span>Cerrar Sesión</span>
             </button>
           </div>
-
         </div>
       </aside>
 
-      {/* Overlay mobile */}
       {isSidebarOpen && (
-        <div className="fixed inset-0 z-30 lg:hidden" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={() => setSidebarOpen(false)} />
+        <div className="fixed inset-0 z-30 lg:hidden" style={{ backgroundColor:'rgba(0,0,0,0.5)' }}
+          onClick={()=>setSidebarOpen(false)}/>
       )}
 
       {/* ── Main ── */}
       <main className="flex-1 overflow-auto">
-        <header className="bg-white shadow-md p-4 lg:p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="lg:hidden p-2" style={{ color: '#1d1d1b' }}>
-                {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
-              </button>
-              <h1 className="text-xl lg:text-2xl" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#1d1d1b' }}>
-                {menuItems.find(m => m.id === activeTab)?.label}
-              </h1>
-            </div>
+        <header className="bg-white border-b px-4 lg:px-8 py-4" style={{ borderColor:'#ebebeb' }}>
+          <div className="flex items-center gap-4">
+            <button onClick={()=>setSidebarOpen(!isSidebarOpen)} className="lg:hidden p-1.5 rounded-lg"
+              style={{ color:'#1d1d1b' }}>
+              {isSidebarOpen?<X size={22}/>:<Menu size={22}/>}
+            </button>
+            <h1 className="text-lg font-medium" style={{ fontFamily:'Montserrat, sans-serif', color:'#1d1d1b' }}>
+              {menuItems.find(m=>m.id===activeTab)?.label}
+            </h1>
           </div>
         </header>
 
-        <div className="p-4 lg:p-6">
+        <div className="p-4 lg:p-8">
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: '#f18517' }} />
+              <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
+                style={{ borderColor:'#f18517', borderTopColor:'transparent' }}/>
             </div>
           ) : (
             <>
-              {/* ── DASHBOARD ── */}
-              {activeTab === 'dashboard' && (
+              {/* ══ DASHBOARD ══ */}
+              {activeTab==='dashboard' && (
                 <div className="space-y-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-                    {stats.map(({ label, value, color }) => (
-                      <div key={label} className="bg-white rounded-xl shadow-lg p-6">
-                        <h3 className="text-sm mb-2" style={{ color: '#808080' }}>{label}</h3>
-                        <p className="text-3xl" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color }}>{value}</p>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    {stats.map(({label,value,color})=>(
+                      <div key={label} className="bg-white rounded-xl p-5 shadow-sm border" style={{ borderColor:'#ebebeb' }}>
+                        <p className="text-xs mb-3 uppercase tracking-wide" style={{ color:'#b0b0b0' }}>{label}</p>
+                        <p className="text-4xl font-light" style={{ fontFamily:'Montserrat, sans-serif', color }}>{value}</p>
                       </div>
                     ))}
                   </div>
 
-                  {/* Proyectos recientes */}
-                  {projects.length > 0 && (
-                    <div className="bg-white rounded-xl shadow-lg p-6">
-                      <h3 className="text-lg mb-4" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#1d1d1b' }}>
-                        Proyectos Recientes
-                      </h3>
-                      <div className="space-y-3">
-                        {projects.slice(0, 4).map(p => (
-                          <div key={p.id} className="flex items-center justify-between p-3 rounded-lg" style={{ backgroundColor: '#f5f5f5' }}>
-                            <div>
-                              <p className="font-medium text-sm" style={{ color: '#1d1d1b' }}>{p.title}</p>
-                              <p className="text-xs" style={{ color: '#808080' }}>{p.date} · {p.category}</p>
-                            </div>
-                            <span className="px-2 py-1 rounded-full text-xs" style={{ backgroundColor: getStatusColor(p.status) + '20', color: getStatusColor(p.status) }}>
-                              {getStatusLabel(p.status)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
+                  <div className="bg-white rounded-xl shadow-sm border overflow-hidden" style={{ borderColor:'#ebebeb' }}>
+                    <div className="px-6 py-4 border-b" style={{ borderColor:'#ebebeb' }}>
+                      <h3 className="text-sm font-medium" style={{ color:'#1d1d1b' }}>Proyectos Recientes</h3>
                     </div>
-                  )}
-                </div>
-              )}
-
-              {/* ── PROYECTOS → sincronizado con calendario y presupuesto ── */}
-              {activeTab === 'projects' && (
-                <ProjectManagement
-                  projects={projects}
-                  onProjectsChange={handleProjectsChange}
-                />
-              )}
-
-              {/* ── CALENDARIO → lee directamente el estado projects ── */}
-              {activeTab === 'calendar' && (
-                <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                  <div className="p-6 border-b" style={{ borderColor: '#e0e0e0' }}>
-                    <h2 className="text-xl" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#1d1d1b' }}>
-                      Calendario de Proyectos
-                    </h2>
-                    <p className="text-sm mt-1" style={{ color: '#808080' }}>
-                      {projects.length} proyecto{projects.length !== 1 ? 's' : ''} registrado{projects.length !== 1 ? 's' : ''}
-                    </p>
-                  </div>
-                  <div className="p-6">
-                    {projects.length === 0 ? (
-                      <p className="text-center py-12 text-sm" style={{ color: '#808080' }}>
-                        No hay proyectos en el calendario. Crea uno desde la sección «Proyectos».
+                    {recentProjects.length===0 ? (
+                      <p className="p-6 text-sm text-center" style={{ color:'#b0b0b0' }}>
+                        Crea el primer proyecto desde «Proyectos».
                       </p>
-                    ) : (
-                      <div className="space-y-4">
-                        {[...projects]
-                          .sort((a, b) => new Date(a.date) - new Date(b.date))
-                          .map(project => (
-                            <div
-                              key={project.id}
-                              className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-xl border hover:shadow-md transition-shadow"
-                              style={{ borderLeftWidth: 4, borderLeftColor: getStatusColor(project.status), borderColor: '#e0e0e0', backgroundColor: getStatusColor(project.status) + '08' }}
-                            >
-                              {/* Fecha */}
-                              <div className="flex-shrink-0 w-16 h-16 rounded-xl flex flex-col items-center justify-center text-white"
-                                style={{ backgroundColor: getStatusColor(project.status) }}>
-                                {project.date ? (
-                                  <>
-                                    <span className="text-xs font-medium uppercase">
-                                      {new Date(project.date + 'T00:00:00').toLocaleDateString('es-CO', { month: 'short' })}
-                                    </span>
-                                    <span className="text-2xl font-bold leading-none">
-                                      {new Date(project.date + 'T00:00:00').getDate()}
-                                    </span>
-                                    <span className="text-xs">
-                                      {new Date(project.date + 'T00:00:00').getFullYear()}
-                                    </span>
-                                  </>
-                                ) : (
-                                  <span className="text-xs">TBD</span>
-                                )}
-                              </div>
-
-                              {/* Info */}
-                              <div className="flex-1 min-w-0">
-                                <div className="flex flex-wrap items-center gap-2 mb-1">
-                                  <h3 className="font-medium" style={{ color: '#1d1d1b' }}>{project.title}</h3>
-                                  <span className="px-2 py-0.5 rounded-full text-xs" style={{ backgroundColor: getStatusColor(project.status) + '20', color: getStatusColor(project.status) }}>
-                                    {getStatusLabel(project.status)}
+                    ):(
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead><tr style={{ backgroundColor:'#fafafa' }}>
+                            {['Nombre','Categoría','Estado','Presupuesto','Miembros','Fecha inicio'].map(h=>(
+                              <th key={h} className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wide"
+                                style={{ color:'#b0b0b0' }}>{h}</th>
+                            ))}
+                          </tr></thead>
+                          <tbody>
+                            {recentProjects.map(p=>(
+                              <tr key={p.id} className="border-t hover:bg-gray-50 transition-colors"
+                                style={{ borderColor:'#ebebeb' }}>
+                                <td className="px-5 py-3.5 text-sm font-medium" style={{ color:'#1d1d1b' }}>{p.title}</td>
+                                <td className="px-5 py-3.5 text-sm" style={{ color:'#808080' }}>{p.category}</td>
+                                <td className="px-5 py-3.5">
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs"
+                                    style={{ backgroundColor:getColor(p.status)+'18', color:getColor(p.status) }}>
+                                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor:getColor(p.status) }}/>
+                                    {getLabel(p.status)}
                                   </span>
-                                  <span className="px-2 py-0.5 rounded text-xs" style={{ backgroundColor: '#f5f5f5', color: '#808080' }}>
-                                    {project.category}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-4 mt-2 text-xs" style={{ color: '#808080' }}>
-                                  <span>{project.teamMembers?.length || 0} miembro{(project.teamMembers?.length || 0) !== 1 ? 's' : ''}</span>
-                                  <span>{project.tasks?.length || 0} tarea{(project.tasks?.length || 0) !== 1 ? 's' : ''}</span>
-                                </div>
-                                {/* Mini barra de progreso */}
-                                <div className="flex-shrink-0 w-full sm:w-40 mt-2">
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className="text-xs" style={{ color: '#808080' }}>Progreso</span>
-                                    <span className="text-xs font-medium" style={{ color: '#1d1d1b' }}>{project.progress}%</span>
-                                  </div>
-                                  <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                                    <div className="h-full rounded-full transition-all duration-500"
-                                      style={{ width: `${project.progress}%`, backgroundColor: getStatusColor(project.status) }} />
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
+                                </td>
+                                <td className="px-5 py-3.5 text-sm" style={{ color:'#1d1d1b' }}>{COP(p.budget)}</td>
+                                <td className="px-5 py-3.5 text-sm text-center" style={{ color:'#1d1d1b' }}>
+                                  {p.teamMembers?.length||0}
+                                </td>
+                                <td className="px-5 py-3.5 text-sm" style={{ color:'#808080' }}>{p.date||'—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     )}
                   </div>
                 </div>
               )}
 
-              {/* ── PRESUPUESTO → sincronizado con projects ── */}
-              {activeTab === 'budget' && (
-                <BudgetManagement
-                  projects={projects}
-                  onProjectsChange={handleProjectsChange}
-                />
+              {activeTab==='projects'  && <ProjectManagement projects={projects} onProjectsChange={setNormalizedProjects}/>}
+
+              {/* ══ CALENDARIO ══ */}
+              {activeTab==='calendar' && (
+                <div className="bg-white rounded-xl shadow-sm border overflow-hidden" style={{ borderColor:'#ebebeb' }}>
+                  <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor:'#ebebeb' }}>
+                    <h2 className="text-sm font-medium" style={{ color:'#1d1d1b' }}>
+                      Calendario de proyectos
+                    </h2>
+                    <span className="text-xs px-2.5 py-1 rounded-full" style={{ backgroundColor:'#f5f5f5', color:'#808080' }}>
+                      {projects.length} proyecto{projects.length!==1?'s':''}
+                    </span>
+                  </div>
+                  <div className="p-6">
+                    {projects.length===0 ? (
+                      <p className="text-center py-16 text-sm" style={{ color:'#b0b0b0' }}>
+                        No hay proyectos. Crea uno desde «Proyectos».
+                      </p>
+                    ):(
+                      <div className="space-y-3">
+                        {[...projects].sort((a,b)=>new Date(a.date||0)-new Date(b.date||0)).map(p=>{
+                          const progress = p.budget>0 ? Math.min(100,Math.round(((p.spent||0)/p.budget)*100)) : 0;
+                          const accent   = getColor(p.status);
+                          return (
+                            <div key={p.id}
+                              className="rounded-xl border overflow-hidden transition-shadow hover:shadow-md"
+                              style={{ borderColor:'#ebebeb' }}>
+                              {/* Banda de color superior */}
+                              <div className="h-1" style={{ backgroundColor: accent }}/>
+
+                              <div className="p-5">
+                                {/* Fila 1: nombre + badges */}
+                                <div className="flex flex-wrap items-center gap-2 mb-3">
+                                  <span className="font-semibold text-sm" style={{ color:'#1d1d1b', fontFamily:'Montserrat, sans-serif' }}>
+                                    {p.title}
+                                  </span>
+                                  <span className="text-xs px-2.5 py-0.5 rounded-full font-medium"
+                                    style={{ backgroundColor:accent+'18', color:accent }}>
+                                    {getLabel(p.status)}
+                                  </span>
+                                  <span className="text-xs px-2.5 py-0.5 rounded-full"
+                                    style={{ backgroundColor:'#f5f5f5', color:'#888' }}>
+                                    {p.category}
+                                  </span>
+                                </div>
+
+                                {/* Fila 2: datos en grid compacto */}
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                                  {/* Inicio */}
+                                  <div className="flex flex-col gap-0.5">
+                                    <span className="text-xs uppercase tracking-wide" style={{ color:'#b0b0b0' }}>Inicio</span>
+                                    <span className="text-sm font-medium" style={{ color:'#1d1d1b' }}>
+                                      {p.date
+                                        ? new Date(p.date+'T00:00:00').toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'})
+                                        : '—'}
+                                    </span>
+                                  </div>
+                                  {/* Fin — solo si existe */}
+                                  {p.endDate && (
+                                    <div className="flex flex-col gap-0.5">
+                                      <span className="text-xs uppercase tracking-wide" style={{ color:'#b0b0b0' }}>Finalización</span>
+                                      <span className="text-sm font-medium" style={{ color:'#1d1d1b' }}>
+                                        {new Date(p.endDate+'T00:00:00').toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'})}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {/* Equipo */}
+                                  <div className="flex flex-col gap-0.5">
+                                    <span className="text-xs uppercase tracking-wide" style={{ color:'#b0b0b0' }}>Equipo</span>
+                                    <span className="text-sm font-medium" style={{ color:'#1d1d1b' }}>
+                                      {p.teamMembers?.length||0} miembro{(p.teamMembers?.length||0)!==1?'s':''}
+                                    </span>
+                                  </div>
+                                  {/* Tareas */}
+                                  <div className="flex flex-col gap-0.5">
+                                    <span className="text-xs uppercase tracking-wide" style={{ color:'#b0b0b0' }}>Tareas</span>
+                                    <span className="text-sm font-medium" style={{ color:'#1d1d1b' }}>
+                                      {p.tasks?.length||0} tarea{(p.tasks?.length||0)!==1?'s':''}
+                                    </span>
+                                  </div>
+                                  {/* Presupuesto */}
+                                  <div className="flex flex-col gap-0.5 sm:col-span-2">
+                                    <span className="text-xs uppercase tracking-wide" style={{ color:'#b0b0b0' }}>Presupuesto</span>
+                                    <span className="text-sm font-medium" style={{ color:'#1d1d1b' }}>{COP(p.budget)}</span>
+                                  </div>
+                                </div>
+
+                                {/* Barra de progreso */}
+                                <div className="flex items-center gap-3">
+                                  <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor:'#f0f0f0' }}>
+                                    <div className="h-full rounded-full transition-all duration-500"
+                                      style={{ width:`${progress}%`, backgroundColor: progress>=100?'#28a745':accent }}/>
+                                  </div>
+                                  <span className="text-xs font-medium w-9 text-right flex-shrink-0" style={{ color:'#888' }}>
+                                    {progress}%
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
 
-              {/* ── SERVICIOS ── */}
-              {activeTab === 'services' && (
-                <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                  <div className="p-4 lg:p-6 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-4" style={{ borderColor: '#e0e0e0' }}>
-                    <h2 className="text-xl" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#1d1d1b' }}>Gestión de Servicios</h2>
-                    <button className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all hover:shadow-lg" style={{ backgroundColor: '#f18517', color: 'white' }}>
-                      <Plus size={20} />Nuevo Servicio
-                    </button>
+              {activeTab==='budget' && <BudgetManagement projects={projects} onProjectsChange={setNormalizedProjects}/>}
+
+              {/* ══ SERVICIOS ══ */}
+              {activeTab==='services' && (
+                <div className="bg-white rounded-xl shadow-sm border overflow-hidden" style={{ borderColor:'#ebebeb' }}>
+                  <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor:'#ebebeb' }}>
+                    <h2 className="text-sm font-medium" style={{ color:'#1d1d1b' }}>Gestión de Servicios</h2>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs px-2.5 py-1 rounded-full" style={{ backgroundColor:'#fff8e1', color:'#b45309' }}>
+                        En desarrollo
+                      </span>
+                      <button disabled className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm opacity-40 cursor-not-allowed"
+                        style={{ backgroundColor:'#f18517', color:'white' }}>
+                        <Plus size={15}/> Nuevo
+                      </button>
+                    </div>
                   </div>
-                  <div className="p-4 lg:p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-                    {services.map(service => (
-                      <div key={service.id} className="border rounded-lg p-6 hover:shadow-lg transition-shadow" style={{ borderColor: '#e0e0e0' }}>
-                        <div className="flex items-start justify-between mb-4">
-                          <h3 className="text-lg" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#1d1d1b' }}>{service.name}</h3>
-                          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: service.active ? '#28a745' : '#dc3545' }} />
+                  <div className="p-6">
+                    <div className="mb-4 p-3.5 rounded-lg text-sm" style={{ backgroundColor:'#fff8e1', color:'#92400e' }}>
+                      Próximamente podrás agregar, editar y eliminar servicios que se reflejarán en la página principal.
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {services.map(s=>(
+                        <div key={s.id} className="border rounded-xl p-5 hover:shadow-md transition-shadow"
+                          style={{ borderColor:'#ebebeb' }}>
+                          <div className="flex items-start justify-between mb-4">
+                            <p className="font-medium text-sm" style={{ color:'#1d1d1b' }}>{s.name}</p>
+                            <span className="w-2 h-2 rounded-full mt-1.5"
+                              style={{ backgroundColor:s.active?'#28a745':'#dc3545' }}/>
+                          </div>
+                          <div className="flex gap-2">
+                            <button disabled className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs opacity-40 cursor-not-allowed"
+                              style={{ borderColor:'#e0e0e0', color:'#1d1d1b' }}>
+                              <Edit size={13}/> Editar
+                            </button>
+                            <button disabled className="px-3 py-1.5 rounded-lg border text-xs opacity-40 cursor-not-allowed"
+                              style={{ borderColor:'#e0e0e0', color:'#dc3545' }}>
+                              <Trash2 size={13}/>
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex gap-2">
-                          <button className="flex-1 px-4 py-2 rounded-lg border hover:bg-gray-50 transition-colors" style={{ borderColor: '#e0e0e0', color: '#1d1d1b' }}>
-                            <Edit size={16} className="inline mr-2" />Editar
-                          </button>
-                          <button className="px-4 py-2 rounded-lg border hover:bg-gray-50 transition-colors" style={{ borderColor: '#e0e0e0', color: '#dc3545' }}>
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ══ CONTENIDO ══ */}
+              {activeTab==='content' && (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl text-sm" style={{ backgroundColor:'#fff8e1', color:'#92400e' }}>
+                    Gestión de contenido en desarrollo. Próximamente podrás editar misión, visión, equipo y aliados desde aquí.
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {['Misión','Visión','Valores','Equipo de Trabajo','Aliados'].map(t=>(
+                      <button key={t} disabled
+                        className="text-left p-4 border rounded-xl bg-white opacity-60 cursor-not-allowed"
+                        style={{ borderColor:'#ebebeb' }}>
+                        <p className="text-sm font-medium" style={{ color:'#1d1d1b' }}>{t}</p>
+                        <p className="text-xs mt-0.5" style={{ color:'#b0b0b0' }}>Editar {t.toLowerCase()}</p>
+                      </button>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* ── CONTENIDO ── */}
-              {activeTab === 'content' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-                  <div className="bg-white rounded-xl shadow-lg p-4 lg:p-6">
-                    <h2 className="text-xl mb-4" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#1d1d1b' }}>Contenido Institucional</h2>
-                    <div className="space-y-4">
-                      {[{ title: 'Misión', sub: 'Editar misión institucional' }, { title: 'Visión', sub: 'Editar visión institucional' }, { title: 'Valores', sub: 'Gestionar valores corporativos' }].map(({ title, sub }) => (
-                        <button key={title} className="w-full text-left p-4 border rounded-lg hover:bg-gray-50 transition-colors" style={{ borderColor: '#e0e0e0' }}>
-                          <h3 className="mb-1" style={{ color: '#1d1d1b' }}>{title}</h3>
-                          <p className="text-sm" style={{ color: '#808080' }}>{sub}</p>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="bg-white rounded-xl shadow-lg p-4 lg:p-6">
-                    <h2 className="text-xl mb-4" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#1d1d1b' }}>Equipo y Aliados</h2>
-                    <div className="space-y-4">
-                      {[{ title: 'Equipo de Trabajo', sub: 'Gestionar miembros del equipo' }, { title: 'Aliados', sub: 'Gestionar aliados estratégicos' }].map(({ title, sub }) => (
-                        <button key={title} className="w-full text-left p-4 border rounded-lg hover:bg-gray-50 transition-colors" style={{ borderColor: '#e0e0e0' }}>
-                          <h3 className="mb-1" style={{ color: '#1d1d1b' }}>{title}</h3>
-                          <p className="text-sm" style={{ color: '#808080' }}>{sub}</p>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ── USUARIOS (solo SUPER_ADMIN) ── */}
-              {activeTab === 'users' && isSuperAdmin && (
-                <div className="space-y-4 lg:space-y-6">
-
-                  {/* Solicitudes pendientes */}
-                  <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                    <div className="p-4 lg:p-6 border-b" style={{ borderColor: '#e0e0e0', backgroundColor: (pendingUsers?.length || 0) > 0 ? '#fffbea' : 'white' }}>
-                      <h2 className="text-lg lg:text-xl" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: (pendingUsers?.length || 0) > 0 ? '#f18517' : '#1d1d1b' }}>
-                        Solicitudes Pendientes ({pendingUsers?.length || 0})
+              {/* ══ USUARIOS ══ */}
+              {activeTab==='users' && isSuperAdmin && (
+                <div className="space-y-6">
+                  {/* Pendientes */}
+                  <div className="bg-white rounded-xl shadow-sm border overflow-hidden" style={{ borderColor:'#ebebeb' }}>
+                    <div className="px-6 py-4 border-b"
+                      style={{ borderColor:'#ebebeb', backgroundColor:(pendingUsers?.length||0)>0?'#fffbf0':'white' }}>
+                      <h2 className="text-sm font-medium"
+                        style={{ color:(pendingUsers?.length||0)>0?'#b45309':'#1d1d1b' }}>
+                        Solicitudes pendientes · {pendingUsers?.length||0}
                       </h2>
                     </div>
-                    <div className="p-4 lg:p-6">
-                      {(pendingUsers?.length || 0) === 0 ? (
-                        <p className="text-center py-8 text-sm" style={{ color: '#808080' }}>No hay solicitudes pendientes.</p>
-                      ) : (
-                        <div className="space-y-4">
-                          {pendingUsers.map(user => (
-                            <div key={user.id} className="flex flex-col p-4 border rounded-xl gap-4" style={{ borderColor: '#e0e0e0' }}>
+                    <div className="p-6">
+                      {(pendingUsers?.length||0)===0 ? (
+                        <p className="text-sm text-center py-6" style={{ color:'#b0b0b0' }}>
+                          No hay solicitudes pendientes.
+                        </p>
+                      ):(
+                        <div className="space-y-3">
+                          {pendingUsers.map(u=>(
+                            <div key={u.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border rounded-xl"
+                              style={{ borderColor:'#ebebeb' }}>
                               <div>
-                                <p className="font-medium text-lg" style={{ color: '#1d1d1b', fontFamily: 'Montserrat, sans-serif' }}>{user.fullName || user.name}</p>
-                                <p className="text-sm break-all" style={{ color: '#808080' }}>{user.email}</p>
-                                {user.username && <p className="text-sm" style={{ color: '#808080' }}>Usuario: @{user.username}</p>}
-                                <p className="text-xs mt-1" style={{ color: '#b0b0b0' }}>Solicitud: {user.requestDate || user.date || 'Hoy'} · Rol: {user.role}</p>
+                                <p className="font-medium text-sm" style={{ color:'#1d1d1b' }}>{u.fullName||u.name}</p>
+                                <p className="text-xs mt-0.5" style={{ color:'#808080' }}>{u.email}</p>
+                                {u.username && <p className="text-xs" style={{ color:'#b0b0b0' }}>@{u.username}</p>}
                               </div>
-                              <div className="flex flex-col sm:flex-row gap-2">
-                                <button onClick={() => handleApproveUser(user.id)}
-                                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-all hover:shadow-lg"
-                                  style={{ backgroundColor: '#28a745', color: 'white' }}>
-                                  <CheckCircle size={18} /><span>Aprobar</span>
+                              <div className="flex gap-2">
+                                <button onClick={()=>approveUser(u.id)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:shadow-md"
+                                  style={{ backgroundColor:'#28a745', color:'white' }}>
+                                  <CheckCircle size={13}/> Aprobar
                                 </button>
-                                <button onClick={() => handleRejectUser(user.id)}
-                                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-all hover:shadow-lg"
-                                  style={{ backgroundColor: '#dc3545', color: 'white' }}>
-                                  <XCircle size={18} /><span>Rechazar</span>
+                                <button onClick={()=>rejectUser(u.id)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:shadow-md"
+                                  style={{ backgroundColor:'#dc3545', color:'white' }}>
+                                  <XCircle size={13}/> Rechazar
                                 </button>
                               </div>
                             </div>
@@ -439,52 +561,83 @@ export function AdminDashboard({ onLogout, userData, pendingUsers, onPendingUser
                     </div>
                   </div>
 
-                  {/* Usuarios activos */}
-                  <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                    <div className="p-4 lg:p-6 border-b" style={{ borderColor: '#e0e0e0' }}>
-                      <h2 className="text-lg lg:text-xl" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 500, color: '#1d1d1b' }}>
-                        Usuarios Activos ({activeUsers.length})
+                  {/* Activos */}
+                  <div className="bg-white rounded-xl shadow-sm border overflow-hidden" style={{ borderColor:'#ebebeb' }}>
+                    <div className="px-6 py-4 border-b" style={{ borderColor:'#ebebeb' }}>
+                      <h2 className="text-sm font-medium" style={{ color:'#1d1d1b' }}>
+                        Usuarios · {activeUsers.length}
                       </h2>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full">
-                        <thead style={{ backgroundColor: '#f5f5f5' }}>
-                          <tr>
-                            {['Usuario', 'Email', 'Rol', 'Estado'].map(h => (
-                              <th key={h} className="text-left p-3 lg:p-4 text-sm font-medium" style={{ color: '#1d1d1b' }}>{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {activeUsers.map(user => (
-                            <tr key={user.id} className="border-b" style={{ borderColor: '#e0e0e0' }}>
-                              <td className="p-3 lg:p-4">
-                                <p className="text-sm font-medium" style={{ color: '#1d1d1b' }}>{user.fullName || user.name}</p>
-                                {user.username && <p className="text-xs" style={{ color: '#808080' }}>@{user.username}</p>}
-                              </td>
-                              <td className="p-3 lg:p-4 text-sm break-all" style={{ color: '#808080' }}>{user.email}</td>
-                              <td className="p-3 lg:p-4">
-                                <span className="px-2 py-1 rounded-full text-xs font-medium"
-                                  style={{ backgroundColor: user.role === 'SUPER_ADMIN' || user.role === 'superadmin' ? '#f18517' : '#6c757d', color: 'white' }}>
-                                  {user.role === 'SUPER_ADMIN' || user.role === 'superadmin' ? 'Super Admin' : user.role}
-                                </span>
-                              </td>
-                              <td className="p-3 lg:p-4">
-                                <span className="px-2 py-1 rounded-full text-xs" style={{ backgroundColor: '#d4edda', color: '#155724' }}>
-                                  Activo
-                                </span>
-                              </td>
-                            </tr>
+                        <thead><tr style={{ backgroundColor:'#fafafa' }}>
+                          {['Usuario','Email','Rol','Estado','Acciones'].map(h=>(
+                            <th key={h} className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wide"
+                              style={{ color:'#b0b0b0' }}>{h}</th>
                           ))}
-                          {activeUsers.length === 0 && (
-                            <tr><td colSpan="4" className="p-4 text-center text-sm" style={{ color: '#808080' }}>No hay usuarios activos.</td></tr>
-                          )}
+                        </tr></thead>
+                        <tbody>
+                          {activeUsers.map(u=>{
+                            const isAdmin0   = u.id===0;
+                            const isInactive = u.status==='INACTIVE';
+                            return (
+                              <tr key={u.id} className="border-t" style={{ borderColor:'#ebebeb', opacity:isInactive?0.6:1 }}>
+                                <td className="px-5 py-3.5">
+                                  <p className="text-sm font-medium" style={{ color:'#1d1d1b' }}>{u.fullName||u.name}</p>
+                                  {u.username && <p className="text-xs" style={{ color:'#b0b0b0' }}>@{u.username}</p>}
+                                </td>
+                                <td className="px-5 py-3.5 text-sm" style={{ color:'#808080' }}>{u.email}</td>
+                                <td className="px-5 py-3.5">
+                                  <span className="text-xs px-2.5 py-1 rounded-full"
+                                    style={{ backgroundColor:u.role==='SUPER_ADMIN'?'#f18517':'#6c757d', color:'white' }}>
+                                    {u.role==='SUPER_ADMIN'||u.role==='superadmin'?'Super Admin':u.role}
+                                  </span>
+                                </td>
+                                <td className="px-5 py-3.5">
+                                  <span className="text-xs px-2.5 py-1 rounded-full"
+                                    style={{ backgroundColor:isInactive?'#fce8e8':'#e8f5e9', color:isInactive?'#c0392b':'#27ae60' }}>
+                                    {isInactive?'Inactivo':'Activo'}
+                                  </span>
+                                </td>
+                                <td className="px-5 py-3.5">
+                                  {isAdmin0 ? (
+                                    <span className="text-xs" style={{ color:'#d0d0d0' }}>Protegido</span>
+                                  ):(
+                                    <div className="flex gap-2">
+                                      {isInactive ? (
+                                        <button onClick={()=>enableUser(u.id)}
+                                          className="text-xs px-2.5 py-1 rounded-lg border transition-colors hover:bg-green-50"
+                                          style={{ borderColor:'#28a745', color:'#28a745' }}>
+                                          Activar
+                                        </button>
+                                      ):(
+                                        <button onClick={()=>disableUser(u.id)}
+                                          className="text-xs px-2.5 py-1 rounded-lg border transition-colors hover:bg-yellow-50 flex items-center gap-1"
+                                          style={{ borderColor:'#d97706', color:'#d97706' }}>
+                                          <Ban size={11}/> Inhabilitar
+                                        </button>
+                                      )}
+                                      <button onClick={()=>deleteUser(u.id)}
+                                        className="text-xs px-2.5 py-1 rounded-lg border transition-colors hover:bg-red-50"
+                                        style={{ borderColor:'#dc3545', color:'#dc3545' }}>
+                                        Eliminar
+                                      </button>
+                                    </div>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
                   </div>
-
                 </div>
+              )}
+
+              {/* ══ MI PERFIL ══ */}
+              {activeTab==='profile' && (
+                <ProfileSection userData={currentUser} onUserDataChange={u=>setCurrentUser(u)}/>
               )}
             </>
           )}

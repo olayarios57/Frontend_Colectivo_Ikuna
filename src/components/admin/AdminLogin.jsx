@@ -1,12 +1,93 @@
-import { useState } from 'react';
-import { User, Lock, X, AlertCircle, UserPlus, Mail, CheckCircle } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { User, Lock, X, AlertCircle, UserPlus, Mail, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { apiService } from '../../services/apiService';
 
+// ── Componente reutilizable para input de contraseña con ojito ──────────────
+// Usa useCallback + onMouseDown preventDefault para evitar pérdida de foco
+function PwInput({ id, value, onChange, placeholder, label }) {
+  const [show, setShow] = useState(false);
+
+  const toggle = useCallback((e) => {
+    e.preventDefault(); // ← evita que el input pierda el foco
+    setShow(s => !s);
+  }, []);
+
+  return (
+    <div>
+      {label && (
+        <label htmlFor={id} className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>
+          {label}
+        </label>
+      )}
+      <div className="relative">
+        <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#808080' }}>
+          <Lock size={18} />
+        </div>
+        <input
+          type={show ? 'text' : 'password'}
+          id={id}
+          required
+          value={value}
+          onChange={onChange}
+          className="w-full pl-12 pr-12 py-3 border rounded-lg focus:outline-none focus:ring-2"
+          style={{ borderColor: '#e0e0e0', backgroundColor: '#f5f5f5', color: '#1d1d1b' }}
+          placeholder={placeholder}
+        />
+        <button
+          type="button"
+          onMouseDown={toggle}
+          className="absolute right-4 top-1/2 -translate-y-1/2 transition-opacity hover:opacity-70"
+          style={{ color: '#808080' }}
+          aria-label={show ? 'Ocultar contraseña' : 'Ver contraseña'}
+        >
+          {show ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Componente para campos de contraseña en el formulario de registro ────────
+// Versión simplificada con checkbox "Ver contraseña"
+function PwInputRegister({ id, value, onChange, placeholder, label }) {
+  const [show, setShow] = useState(false);
+
+  return (
+    <div>
+      <label htmlFor={id} className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          type={show ? 'text' : 'password'}
+          id={id}
+          required
+          value={value}
+          onChange={onChange}
+          className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2"
+          style={{ borderColor: '#e0e0e0', backgroundColor: '#f9f9f9' }}
+          placeholder={placeholder}
+        />
+        <button
+          type="button"
+          onMouseDown={(e) => { e.preventDefault(); setShow(s => !s); }}
+          className="absolute right-3 top-1/2 -translate-y-1/2"
+          style={{ color: '#808080' }}
+          aria-label={show ? 'Ocultar' : 'Ver'}
+        >
+          {show ? <EyeOff size={16} /> : <Eye size={16} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 export function AdminLogin({ onLogin, onRegisterRequest, onClose }) {
   const [viewMode,     setViewMode]    = useState('login');
   const [credentials,  setCredentials] = useState({ username: '', password: '' });
   const [registerData, setRegisterData] = useState({
-    name: '', email: '', username: '', password: '', confirmPassword: '', role: 'editor',
+    name: '', email: '', username: '', password: '', confirmPassword: '',
   });
   const [forgotEmail,  setForgotEmail] = useState('');
   const [error,        setError]       = useState('');
@@ -14,14 +95,14 @@ export function AdminLogin({ onLogin, onRegisterRequest, onClose }) {
   const [isLoading,    setIsLoading]   = useState(false);
   const [submitted,    setSubmitted]   = useState(false);
 
-  // ── Login ──────────────────────────────────────────────────────
+  // ── Login ──────────────────────────────────────────────────────────────
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
     try {
-      // 1. USUARIO HARDCODEADO para acceso rápido sin backend
+      // 1. Usuario admin hardcodeado
       if (credentials.username === 'admin' && credentials.password === 'ikuna2024') {
         onLogin(true, {
           username: 'admin',
@@ -32,8 +113,12 @@ export function AdminLogin({ onLogin, onRegisterRequest, onClose }) {
         return;
       }
 
-      // 2. Si no es el admin hardcodeado → llamada real al backend
+      // 2. Llamada real al backend
       const user = await apiService.login(credentials);
+      // Solo entran usuarios con status ACTIVE
+      if (user.status && user.status !== 'ACTIVE') {
+        throw new Error('Usuario inactivo o pendiente de aprobación');
+      }
       onLogin(true, {
         username: user.username,
         role:     user.role,
@@ -42,14 +127,19 @@ export function AdminLogin({ onLogin, onRegisterRequest, onClose }) {
       });
     } catch (err) {
       console.error(err);
-      setError('Usuario o contraseña incorrectos');
-      setTimeout(() => setError(''), 3000);
+      const msg = err.message?.includes('inactivo') || err.message?.includes('pendiente')
+        ? 'Tu cuenta aún no ha sido aprobada por el administrador.'
+        : 'Usuario o contraseña incorrectos';
+      setError(msg);
+      // ← Borra automáticamente la contraseña para que el usuario vuelva a ingresarla
+      setCredentials(prev => ({ ...prev, password: '' }));
+      setTimeout(() => setError(''), 4000);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // ── Registro → Llama al backend y respeta las validaciones ──
+  // ── Registro ────────────────────────────────────────────────────────────
   const handleRegister = async (e) => {
     e.preventDefault();
     if (submitted) return;
@@ -59,8 +149,6 @@ export function AdminLogin({ onLogin, onRegisterRequest, onClose }) {
       setTimeout(() => setError(''), 3000);
       return;
     }
-    
-    // CORRECCIÓN: El backend exige mínimo 8 caracteres
     if (registerData.password.length < 8) {
       setError('La contraseña debe tener al menos 8 caracteres');
       setTimeout(() => setError(''), 3000);
@@ -68,29 +156,25 @@ export function AdminLogin({ onLogin, onRegisterRequest, onClose }) {
     }
 
     setIsLoading(true);
-
     try {
-      // Llamada real al backend
       await apiService.register({
-        fullName: registerData.name, // El backend mapea esto a fullName
+        fullName: registerData.name,
         email:    registerData.email,
         username: registerData.username,
         password: registerData.password,
-        role:     registerData.role.toUpperCase(), // Aseguramos que llegue en mayúscula
+        role:     'COLABORADOR',
         status:   'PENDING',
       });
 
-      // Si el código llega aquí, es porque el BACKEND SÍ GUARDÓ en la base de datos
       setSuccess('¡Solicitud enviada! Tu registro está pendiente de aprobación por el administrador.');
       setSubmitted(true);
-      
-      // Notifica a AdminPage si es necesario localmente
+
       if (onRegisterRequest) {
         onRegisterRequest({
           name:     registerData.name,
           email:    registerData.email,
           username: registerData.username,
-          role:     registerData.role,
+          role:     'colaborador',
         });
       }
 
@@ -98,63 +182,74 @@ export function AdminLogin({ onLogin, onRegisterRequest, onClose }) {
         setSuccess('');
         setSubmitted(false);
         setIsLoading(false);
-        setRegisterData({ name: '', email: '', username: '', password: '', confirmPassword: '', role: 'editor' });
+        setRegisterData({ name: '', email: '', username: '', password: '', confirmPassword: '' });
         setViewMode('login');
       }, 3500);
-
     } catch (err) {
-      // CORRECCIÓN: Si el backend rechaza el registro, mostramos el error
       setIsLoading(false);
       console.error('Error del backend:', err);
-      
-      // Intentamos extraer el mensaje de error exacto que manda Spring Boot
       let errorMsg = 'Error al registrar. Verifica los datos o el usuario ya existe.';
-      if (err.response && err.response.data) {
-        // Tu GlobalExceptionHandler devuelve un mapa con los errores (ej: { "password": "La contraseña debe tener al menos 8 caracteres" })
+      if (err.response?.data) {
         const backendErrors = Object.values(err.response.data);
-        if (backendErrors.length > 0) {
-          errorMsg = backendErrors[0]; // Mostramos el primer error que mande el backend
-        }
+        if (backendErrors.length > 0) errorMsg = backendErrors[0];
       }
-      
       setError(errorMsg);
       setTimeout(() => setError(''), 5000);
     }
   };
 
-  // ── Recuperar contraseña ───────────────────────────────────────
-  const handleForgotPassword = (e) => {
+  // ── Recuperar contraseña ─────────────────────────────────────────────────
+  const handleForgotPassword = async (e) => {
     e.preventDefault();
-    setSuccess('Se ha enviado un enlace de recuperación a tu correo electrónico.');
-    setTimeout(() => { setSuccess(''); setForgotEmail(''); setViewMode('login'); }, 3000);
+    setIsLoading(true);
+    try {
+      await apiService.forgotPassword?.(forgotEmail);
+      setSuccess('Se ha enviado un enlace de recuperación a tu correo electrónico.');
+    } catch {
+      // Si el backend aún no tiene el endpoint, igual mostramos el mensaje
+      setSuccess('Si el correo está registrado, recibirás el enlace en breve.');
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => { setSuccess(''); setForgotEmail(''); setViewMode('login'); }, 4000);
+    }
   };
 
-  // ── UI helpers ─────────────────────────────────────────────────
-  const icons  = { login: User, register: UserPlus, forgot: Mail };
-  const titles = { login: 'Acceso Administrador', register: 'Registro de Usuario', forgot: 'Recuperar Contraseña' };
-  const IconHead = icons[viewMode];
+  // ── Cambio de vista → limpiar mensajes ──────────────────────────────────
+  const switchView = (mode) => {
+    setViewMode(mode);
+    setError('');
+    setSuccess('');
+  };
+
+  // ── UI helpers ────────────────────────────────────────────────────────────
+  const iconMap  = { login: User, register: UserPlus, forgot: Mail };
+  const titleMap = { login: 'Acceso Administrador', register: 'Registro de Usuario', forgot: 'Recuperar Contraseña' };
+  const IconHead = iconMap[viewMode];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}>
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col"
+        style={{ maxHeight: '95vh' }}>
 
         {/* ── Header ── */}
-        <div className="p-6 relative" style={{ backgroundColor: '#1d1d1b' }}>
-          <button onClick={onClose} className="absolute top-4 right-4 p-2 hover:opacity-70 transition-opacity" style={{ color: 'white' }} aria-label="Cerrar">
+        <div className="p-6 relative flex-shrink-0" style={{ backgroundColor: '#1d1d1b' }}>
+          <button onClick={onClose} className="absolute top-4 right-4 p-2 hover:opacity-70 transition-opacity"
+            style={{ color: 'white' }} aria-label="Cerrar">
             <X size={24} />
           </button>
           <div className="text-center">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: '#f18517' }}>
+            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+              style={{ backgroundColor: '#f18517' }}>
               <IconHead className="text-white" size={32} />
             </div>
             <h2 className="text-2xl" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 400, color: 'white' }}>
-              {titles[viewMode]}
+              {titleMap[viewMode]}
             </h2>
           </div>
         </div>
 
-        {/* ── Body ── */}
-        <div className="p-8">
+        {/* ── Body con scroll ── */}
+        <div className="p-8 overflow-y-auto flex-1">
 
           {/* Alertas */}
           {error && (
@@ -175,27 +270,27 @@ export function AdminLogin({ onLogin, onRegisterRequest, onClose }) {
                 <label htmlFor="username" className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Usuario</label>
                 <div className="relative">
                   <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#808080' }}><User size={18} /></div>
-                  <input type="text" id="username" required value={credentials.username}
+                  <input
+                    type="text" id="username" required
+                    value={credentials.username}
                     onChange={e => setCredentials({ ...credentials, username: e.target.value })}
                     className="w-full pl-12 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
                     style={{ borderColor: '#e0e0e0', backgroundColor: '#f5f5f5', color: '#1d1d1b' }}
-                    placeholder="Ingresa tu usuario" />
+                    placeholder="Ingresa tu usuario"
+                  />
                 </div>
               </div>
 
-              <div>
-                <label htmlFor="password" className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Contraseña</label>
-                <div className="relative">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#808080' }}><Lock size={18} /></div>
-                  <input type="password" id="password" required value={credentials.password}
-                    onChange={e => setCredentials({ ...credentials, password: e.target.value })}
-                    className="w-full pl-12 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                    style={{ borderColor: '#e0e0e0', backgroundColor: '#f5f5f5', color: '#1d1d1b' }}
-                    placeholder="Ingresa tu contraseña" />
-                </div>
-              </div>
+              <PwInput
+                id="login-password"
+                label="Contraseña"
+                value={credentials.password}
+                onChange={e => setCredentials({ ...credentials, password: e.target.value })}
+                placeholder="Ingresa tu contraseña"
+              />
 
-              <button type="button" onClick={() => setViewMode('forgot')} className="text-sm hover:underline" style={{ color: '#f18517' }}>
+              <button type="button" onClick={() => switchView('forgot')}
+                className="text-sm hover:underline" style={{ color: '#f18517' }}>
                 ¿Olvidaste tu contraseña?
               </button>
 
@@ -210,32 +305,59 @@ export function AdminLogin({ onLogin, onRegisterRequest, onClose }) {
           {/* ── FORMULARIO REGISTRO ── */}
           {viewMode === 'register' && (
             <form onSubmit={handleRegister} className="space-y-4">
-              {[
-                { label: 'Nombre completo *',      key: 'name',            type: 'text',     placeholder: 'Tu nombre completo'    },
-                { label: 'Correo electrónico *',   key: 'email',           type: 'email',    placeholder: 'tu@email.com'          },
-                { label: 'Nombre de usuario *',    key: 'username',        type: 'text',     placeholder: 'Ej: maria_gonzalez'    },
-                { label: 'Contraseña *',           key: 'password',        type: 'password', placeholder: 'Mínimo 8 caracteres'   },
-                { label: 'Confirmar contraseña *', key: 'confirmPassword', type: 'password', placeholder: 'Repite tu contraseña'  },
-              ].map(({ label, key, type, placeholder }) => (
-                <div key={key}>
-                  <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>{label}</label>
-                  <input type={type} required value={registerData[key]}
-                    onChange={e => setRegisterData({ ...registerData, [key]: e.target.value })}
-                    className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2"
-                    style={{ borderColor: '#e0e0e0', backgroundColor: '#f9f9f9' }}
-                    placeholder={placeholder} />
-                </div>
-              ))}
 
               <div>
-                <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Rol solicitado</label>
-                <select value={registerData.role} onChange={e => setRegisterData({ ...registerData, role: e.target.value })}
+                <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Nombre completo *</label>
+                <input type="text" required value={registerData.name}
+                  onChange={e => setRegisterData({ ...registerData, name: e.target.value })}
                   className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2"
-                  style={{ borderColor: '#e0e0e0', backgroundColor: '#f9f9f9' }}>
-                  <option value="editor">Editor</option>
-                  <option value="viewer">Visualizador</option>
-                  <option value="colaborador">Colaborador</option>
-                </select>
+                  style={{ borderColor: '#e0e0e0', backgroundColor: '#f9f9f9' }}
+                  placeholder="Tu nombre completo" />
+              </div>
+
+              <div>
+                <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Correo electrónico *</label>
+                <input type="email" required value={registerData.email}
+                  onChange={e => setRegisterData({ ...registerData, email: e.target.value })}
+                  className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2"
+                  style={{ borderColor: '#e0e0e0', backgroundColor: '#f9f9f9' }}
+                  placeholder="tu@email.com" />
+              </div>
+
+              <div>
+                <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Nombre de usuario *</label>
+                <input type="text" required value={registerData.username}
+                  onChange={e => setRegisterData({ ...registerData, username: e.target.value })}
+                  className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2"
+                  style={{ borderColor: '#e0e0e0', backgroundColor: '#f9f9f9' }}
+                  placeholder="Ej: maria_gonzalez" />
+              </div>
+
+              <PwInputRegister
+                id="reg-password"
+                label="Contraseña * (mínimo 8 caracteres)"
+                value={registerData.password}
+                onChange={e => setRegisterData({ ...registerData, password: e.target.value })}
+                placeholder="Mínimo 8 caracteres"
+              />
+
+              <PwInputRegister
+                id="reg-confirm"
+                label="Confirmar contraseña *"
+                value={registerData.confirmPassword}
+                onChange={e => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
+                placeholder="Repite tu contraseña"
+              />
+
+              {/* Rol fijo: solo colaborador */}
+              <div>
+                <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Rol</label>
+                <input type="text" value="Colaborador" readOnly
+                  className="w-full px-4 py-2.5 border rounded-lg cursor-not-allowed"
+                  style={{ borderColor: '#e0e0e0', backgroundColor: '#f0f0f0', color: '#808080' }} />
+                <p className="text-xs mt-1" style={{ color: '#b0b0b0' }}>
+                  El acceso estará sujeto a aprobación por el administrador.
+                </p>
               </div>
 
               <button type="submit" disabled={isLoading || submitted}
@@ -256,14 +378,17 @@ export function AdminLogin({ onLogin, onRegisterRequest, onClose }) {
                 <label className="block text-sm mb-2" style={{ color: '#1d1d1b' }}>Correo electrónico</label>
                 <div className="relative">
                   <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#808080' }}><Mail size={18} /></div>
-                  <input type="email" required value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
+                  <input type="email" required value={forgotEmail}
+                    onChange={e => setForgotEmail(e.target.value)}
                     className="w-full pl-12 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
                     style={{ borderColor: '#e0e0e0', backgroundColor: '#f5f5f5' }}
                     placeholder="tu@email.com" />
                 </div>
               </div>
-              <button type="submit" className="w-full py-3 rounded-lg font-medium hover:shadow-xl transition-all" style={{ backgroundColor: '#f18517', color: 'white' }}>
-                Enviar Enlace de Recuperación
+              <button type="submit" disabled={isLoading}
+                className="w-full py-3 rounded-lg font-medium hover:shadow-xl transition-all disabled:opacity-50"
+                style={{ backgroundColor: '#f18517', color: 'white' }}>
+                {isLoading ? 'Enviando...' : 'Enviar Enlace de Recuperación'}
               </button>
             </form>
           )}
@@ -271,13 +396,12 @@ export function AdminLogin({ onLogin, onRegisterRequest, onClose }) {
           {/* ── Links de navegación ── */}
           <div className="mt-6 text-center space-y-2 border-t pt-5" style={{ borderColor: '#f0f0f0' }}>
             {viewMode === 'login' && (
-              <button onClick={() => setViewMode('register')} className="text-sm hover:underline" style={{ color: '#808080' }}>
+              <button onClick={() => switchView('register')} className="text-sm hover:underline" style={{ color: '#808080' }}>
                 ¿No tienes cuenta? → Solicitar registro
               </button>
             )}
             {(viewMode === 'register' || viewMode === 'forgot') && (
-              <button onClick={() => { setViewMode('login'); setError(''); setSuccess(''); }}
-                className="text-sm hover:underline" style={{ color: '#808080' }}>
+              <button onClick={() => switchView('login')} className="text-sm hover:underline" style={{ color: '#808080' }}>
                 ← Volver al inicio de sesión
               </button>
             )}
