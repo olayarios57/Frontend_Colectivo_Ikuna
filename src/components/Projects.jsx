@@ -13,36 +13,34 @@ const iconMap = {
 const defaultImage = 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800';
 
 // ════════════════════════════════════════════════════════════════════════════
-// DATOS ESTÁTICOS — Edita aquí tus 10 proyectos reales.
-// Cada proyecto pertenece a UNA de las 4 categorías.
 // images: array con las rutas de las fotos del carrusel del proyecto.
-//         Guarda las imágenes en: public/images/proyectos/
+//         Imágenes guardadas en: public/images/proyectos/
 // ════════════════════════════════════════════════════════════════════════════
 const STATIC_PROJECTS = [
   // ── RESIGNIFICACIÓN DE ESPACIOS ─────────────────────────────────────────
   {
     id:          1,
     category:    'Resignificación de Espacios',
-    title:       'Plaza Cultural Centro',                          // ← EDITA
-    description: 'Intervención artística y cultural del espacio público del centro del municipio, generando un lugar de encuentro para la comunidad.',
-    date:        '2024-03-15',                                     // ← EDITA
-    location:    'Centro, Andes, Antioquia',
-    images: [                                                      // ← EDITA rutas de imágenes
-      '/images/proyectos/plaza-01.jpg',
-      '/images/proyectos/plaza-02.jpg',
-      '/images/proyectos/plaza-03.jpg',
+    title:       'Matices Ancestrales',                          
+    description: 'Proyecto de intervención artística y cultural del espacio público de la calle Arboleda, generando un lugar de encuentro para la comunidad y la dinámica cotidiana de los habitantes.',
+    date:        'Año 2020',                                    
+    location:    'Andes, Antioquia',
+    images: [                                                      
+      '/images/proyectos/matices.jpg',
     ],
   },
   {
     id:          2,
     category:    'Resignificación de Espacios',
-    title:       'Mural Barrio La Candelaria',                     // ← EDITA
-    description: 'Creación de un mural colectivo que narra la historia y la identidad del barrio, con participación activa de los habitantes.',
-    date:        '2024-06-20',
-    location:    'Barrio La Candelaria, Andes, Antioquia',
+    title:       'Andes, Chivas y Café',                     
+    description: 'Proyecto de Megamuralismo, desarrollado para propiciar la resignificación de los espacios a través del arte.',
+    date:        '2021',
+    location:    'Andes, Antioquia',
     images: [
-      '/images/proyectos/mural-01.jpg',
-      '/images/proyectos/mural-02.jpg',
+      '/images/proyectos/sapoliso-cuatro.JPG',
+      '/images/proyectos/sapoliso-tres.JPG',
+      '/images/proyectos/puente-terminado.jpg',
+      '/images/proyectos/mosaico-terminado.jpg',
     ],
   },
 
@@ -50,26 +48,25 @@ const STATIC_PROJECTS = [
   {
     id:          3,
     category:    'Eventos Culturales',
-    title:       'Noche de Cultura Viva',                          // ← EDITA
-    description: 'Evento nocturno con presentaciones artísticas, teatro, danza y música en vivo que reunió a más de 500 personas.',
-    date:        '2024-02-10',
-    location:    'Parque Principal, Andes, Antioquia',
+    title:       'Huellas rurales',                       
+    description: 'Iniciativa de articulación con la Corporación Adagio de La Unión, donde se desarrolló trabajo comunitario en torno al tejido y a la construcción de dinámicas territoriales.',
+    date:        '2022',
+    location:    'Vereda San Gregorio, Andes, Antioquia',
     images: [
-      '/images/proyectos/noche-01.jpg',
-      '/images/proyectos/noche-02.jpg',
-      '/images/proyectos/noche-03.jpg',
+      '/images/proyectos/huellas-rurales.jpg',
+      '/images/proyectos/huellas-rurales-dos.jpg',
     ],
   },
   {
     id:          4,
     category:    'Eventos Culturales',
-    title:       'Feria del Libro Comunitario',                    // ← EDITA
-    description: 'Jornada de promoción de la lectura y la escritura con autores locales, talleres para niños y trueque de libros.',
-    date:        '2024-04-23',
-    location:    'Biblioteca Municipal, Andes, Antioquia',
+    title:       'Encuentro Cultural Literario',                  
+    description: 'Encuentros de reconocimiento literario a escritores y escritoras locales.',
+    date:        '2022',
+    location:    'Parque Principal de Andes, Antioquia',
     images: [
-      '/images/proyectos/feria-libro-01.jpg',
-      '/images/proyectos/feria-libro-02.jpg',
+      '/images/proyectos/gonzalo.jpg',
+      '/images/proyectos/gonzalo-dos.jpg',
     ],
   },
 
@@ -77,27 +74,26 @@ const STATIC_PROJECTS = [
   {
     id:          5,
     category:    'Festivales',
-    title:       'Festival Cultural Ikuna',                        // ← EDITA
-    description: 'Festival anual con más de 20 agrupaciones artísticas del Suroeste Antioqueño, espacio de intercambio cultural y fortalecimiento del tejido social.',
-    date:        '2024-08-12',
+    title:       'Festival Días del Arcoíris',                      
+    description: 'Festival anual que festeja, celebra, defiende y educa en torno a temáticas y derechos LGBTIQ+.',
+    date:        '2020',
     location:    'Coliseo Municipal, Andes, Antioquia',
     images: [
-      '/images/proyectos/festival-01.jpg',
-      '/images/proyectos/festival-02.jpg',
-      '/images/proyectos/festival-03.jpg',
-      '/images/proyectos/festival-04.jpg',
+      '/images/proyectos/festival.jpg',
+      '/images/proyectos/festival2.jpg',
     ],
   },
   {
     id:          6,
     category:    'Festivales',
-    title:       'Festival de las Artes Escénicas',               // ← EDITA
-    description: 'Encuentro regional de teatro, danza y circo con grupos de Antioquia y el Eje Cafetero.',
-    date:        '2024-11-05',
-    location:    'Teatro Municipal, Andes, Antioquia',
+    title:       'Parchados Rap Festival',              
+    description: 'Festival de música urbana que reune diferentes exponentes de la región en el género rap.',
+    date:        '2022',
+    location:    'Sinforoso - Andes, Antioquia',
     images: [
-      '/images/proyectos/artes-escenicas-01.jpg',
-      '/images/proyectos/artes-escenicas-02.jpg',
+      '/images/proyectos/festival-rap-cinco.jpg',
+      '/images/proyectos/festival-rap-cuatro.jpg',
+      '/images/proyectos/rap-2025.jpg',
     ],
   },
 
@@ -105,51 +101,25 @@ const STATIC_PROJECTS = [
   {
     id:          7,
     category:    'Talleres y Pedagogía',
-    title:       'Taller de Teatro Comunitario',                   // ← EDITA
-    description: 'Proceso formativo de 3 meses con jóvenes del municipio, culminando en una obra de teatro participativa sobre la memoria del territorio.',
-    date:        '2024-01-15',
-    location:    'Casa de la Cultura, Andes, Antioquia',
+    title:       'Escuela de las Diversidades',                   
+    description: 'Proceso formativo dirigido a líderes y lideresas juveniles del Suroeste Antioqueño sobre políticas, derechos y temáticas LGBTIQ+ desde las artes y la cultura.',
+    date:        '2024',
+    location:    'Andes y Ciudad Bolívar, Antioquia',
     images: [
-      '/images/proyectos/teatro-01.jpg',
-      '/images/proyectos/teatro-02.jpg',
-      '/images/proyectos/teatro-03.jpg',
+      '/images/proyectos/escuela-diversa.jpg',
+      '/images/proyectos/escuela-diversa-dos.jpg',
     ],
   },
   {
     id:          8,
     category:    'Talleres y Pedagogía',
-    title:       'Escuela de Música Popular',                      // ← EDITA
-    description: 'Taller formativo de instrumentos andinos y música popular colombiana dirigido a niños y jóvenes de 8 a 18 años.',
-    date:        '2024-03-01',
-    location:    'Escuela La Esperanza, Andes, Antioquia',
+    title:       'Laboratorio de creación Raíces',                    
+    description: 'Proceso de formación artística dirigido a artistas experimentales o con trayectoria del Suroeste Antioqueño en el Marco de la Bienal Internacional de Antioquia y Medellín.',
+    date:        '2025',
+    location:    'Andes y Jericó, Antioquia',
     images: [
-      '/images/proyectos/musica-01.jpg',
-      '/images/proyectos/musica-02.jpg',
-    ],
-  },
-  {
-    id:          9,
-    category:    'Talleres y Pedagogía',
-    title:       'Pedagogía Social — Tejido y Memoria',            // ← EDITA
-    description: 'Proceso de recuperación de memoria histórica con adultos mayores usando el tejido artesanal como lenguaje.',
-    date:        '2024-05-10',
-    location:    'Centro de Bienestar del Adulto Mayor, Andes',
-    images: [
-      '/images/proyectos/tejido-01.jpg',
-      '/images/proyectos/tejido-02.jpg',
-    ],
-  },
-  {
-    id:          10,
-    category:    'Talleres y Pedagogía',
-    title:       'Taller de Fotografía Comunitaria',              // ← EDITA
-    description: 'Formación en fotografía documental para jóvenes rurales como herramienta de registro y narración del territorio.',
-    date:        '2024-07-20',
-    location:    'Vereda La Playa, Andes, Antioquia',
-    images: [
-      '/images/proyectos/fotografia-01.jpg',
-      '/images/proyectos/fotografia-02.jpg',
-      '/images/proyectos/fotografia-03.jpg',
+      '/images/proyectos/laboratorio-cinco.jpg',
+      '/images/proyectos/laboratorio.jpg',
     ],
   },
 ];

@@ -5,7 +5,6 @@ const CONTACT_EMAIL = 'ikunacolectivo@gmail.com';
 const WHATSAPP_URL  = 'https://wa.me/573015816157';
 
 // ── Coordenadas del Parque Principal de Andes, Antioquia (CP 056060) ──
-// Embed de Google Maps sin API Key (compartido desde maps.google.com)
 const MAPS_EMBED_URL =
   'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3965.7!2d-75.8796!3d5.6582!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8e468a7c5e5c5e5d%3A0x1234567890abcdef!2sParque%20Principal%20de%20Andes!5e0!3m2!1ses!2sco!4v1700000000000!5m2!1ses!2sco';
 
