@@ -1,29 +1,30 @@
 import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, ArrowRight, Sparkles, Calendar, Users, Heart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-
 import logoIkuna from '../assets/logo-ikuna.png';
 
 // ════════════════════════════════════════════════════════════════════════════
 // CARRUSEL DE IMÁGENES REALES
-// Guarda las fotos en: public/images/inicio/
-// Puedes usar rutas locales ('/images/inicio/foto1.jpg') o URLs externas.
 // ════════════════════════════════════════════════════════════════════════════
 const carouselImages = [
-  '/images/inicio/foto1.jpg',   // ← REEMPLAZA con tus fotos reales
-  '/images/inicio/foto2.jpg',   // ← REEMPLAZA con tus fotos reales
-  '/images/inicio/foto3.jpg',   // ← REEMPLAZA con tus fotos reales
-  '/images/inicio/foto4.jpg',   // ← REEMPLAZA con tus fotos reales
-  '/images/inicio/foto5.jpg',   // ← REEMPLAZA con tus fotos reales
-  '/images/inicio/foto6.jpg',   // ← REEMPLAZA con tus fotos reales
-  // Agrega o elimina entradas según las fotos disponibles
+  '/images/inicio/festival-rap-tres.jpg',   
+  '/images/inicio/festival-seis.JPG',  
+  '/images/inicio/puente.JPG',  
+  '/images/inicio/festival2.jpg',   
+  '/images/inicio/escaleras-tres.JPG',   
+  '/images/inicio/sapoliso-dos.JPG',
+  '/images/inicio/hospital-tres.JPG',    
+  '/images/inicio/tejedoras.jpg',  
+  '/images/inicio/grados-laboratorio.jpg',  
+  '/images/inicio/laboratorio-cuatro.jpg', 
+
 ];
 
 // Imagen de respaldo si alguna foto no carga
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1080';
 
 const highlights = [
-  { id: 1, icon: Sparkles, title: '+50 Proyectos',  description: 'Ejecutados exitosamente'  },
+  { id: 1, icon: Sparkles, title: '+30 Proyectos',  description: 'Ejecutados exitosamente'  },
   { id: 2, icon: Calendar, title: '5 Años',          description: 'Transformando cultura'    },
   { id: 3, icon: Users,    title: '1000+ Personas',  description: 'Impactadas positivamente' },
   { id: 4, icon: Heart,    title: '8 Aliados',       description: 'Estratégicos regionales'  },

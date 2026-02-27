@@ -1,7 +1,7 @@
 import { Target, Eye, Heart, Users, Handshake } from 'lucide-react';
 
 // ════════════════════════════════════════════════════════════════════════════
-// IDENTIDAD DEL COLECTIVO — Edita los datos reales aquí
+// IDENTIDAD DEL COLECTIVO
 // Imágenes del equipo → public/images/equipo/
 // Logos de aliados    → public/images/aliados/
 // ════════════════════════════════════════════════════════════════════════════
@@ -13,90 +13,95 @@ const identityData = {
       id:          'amistad',
       title:       'Amistad',
       icon:        Heart,
-      description: 'Es la estructura sobre la cual se crean los lazos de confianza, que a su vez posibilitan los procesos creativos y del hacer.',
+      description: 'Es la estructura sobre la cual se crean los lazos de confianza, que a su vez posibilitan los procesos creativos y del hacer, porque desde la amistad se acompaña, se entiende y se apoya, comprendiendo la amistad como el inicio y la continuación de un proceso que partió de ahí.',
     },
     {
       id:          'proactividad',
       title:       'Proactividad',
       icon:        Target,
-      description: 'Obtener nuevos conocimientos es parte de nuestra esencia. Esperar no es una opción; moverse y provocar los sucesos es nuestro ADN.',
+      description: 'Obtener nuevos conocimientos es parte de nuestra esencia. Esperar no es una opción, moverse y provocar los sucesos y acontecimientos es el ADN de la organización.',
     },
     {
       id:          'pasion',
       title:       'Pasión',
       icon:        Heart,
-      description: 'Nos permitimos disfrutar cada intervención, porque en IKUNA la pasión hace que los procesos se llenen de magia.',
+      description: 'Nos permitimos disfrutar cada intervención, porque en Ikuna la pasión hace que los procesos se llenen de magia y lleven la chispa que nos diferencia de lo monotono y pasivo. Por lo que, cada integrante actúa y se mueve desde el querer y el amor hacía lo que se hace.',
     },
   ],
 
-  // ── EQUIPO DE TRABAJO ────────────────────────────────────────────────────
-  // photo: ruta relativa desde /public — p.ej. '/images/equipo/sara.jpg'
-  // bio:   descripción corta del miembro (2-3 líneas)
+  // ── EQUIPO DE TRABAJO ────────────────────────────────────────────────────//
   team: [
     {
       id:    1,
-      name:  'Sara Olaya',                                     // ← EDITA
-      role:  'Directora y Fundadora',                          // ← EDITA
-      photo: '/images/equipo/sara.jpg',                        // ← EDITA
-      bio:   'Gestora cultural con más de 10 años de experiencia en procesos comunitarios y artísticos en el Suroeste Antioqueño.', // ← EDITA
+      name:  'Estrella Olaya',                                     
+      role:  'Coordinadora Creativa',                          
+      photo: '/images/equipo/foto-star.jpeg',                        
+      bio:   'Comunicadora Social y Periodista', 
     },
     {
       id:    2,
-      name:  'Nombre del Miembro 2',                           // ← EDITA
-      role:  'Coordinador de Proyectos',                       // ← EDITA
-      photo: '/images/equipo/miembro2.jpg',                    // ← EDITA
-      bio:   'Descripción breve del miembro 2.',               // ← EDITA
+      name:  'Rafael Padilla',                           
+      role:  'Coordinador Artístico',                       
+      photo: '/images/equipo/foto-rafa.jpeg',                    
+      bio:   'Diseñador gráfico y artista plástico',               
     },
     {
       id:    3,
-      name:  'Nombre del Miembro 3',                           // ← EDITA
-      role:  'Gestora Cultural',                               // ← EDITA
-      photo: '/images/equipo/miembro3.jpg',                    // ← EDITA
-      bio:   'Descripción breve del miembro 3.',               // ← EDITA
+      name:  'Camilo Olaya',                           
+      role:  'Coordinador Administrativo',                               
+      photo: '/images/equipo/Foto-camilo.jpeg',                    
+      bio:   'Gestor cultural',               
     },
     {
       id:    4,
-      name:  'Nombre del Miembro 4',                           // ← EDITA
-      role:  'Productor Artístico',                            // ← EDITA
-      photo: '/images/equipo/miembro4.jpg',                    // ← EDITA
-      bio:   'Descripción breve del miembro 4.',               // ← EDITA
+      name:  'Sara Olaya',                           
+      role:  'Coordinadora Operativa',                            
+      photo: '/images/equipo/sara-foto.jpg',                   
+      bio:   'Gestora cultural',              
     },
-    // Agrega más miembros copiando el bloque anterior
   ],
 
   // ── ALIADOS ───────────────────────────────────────────────────────────────
-  // logo: ruta relativa desde /public — p.ej. '/images/aliados/alcaldia.png'
-  //       Si no tienes logo, deja logo: null y se mostrará solo el nombre.
   allies: [
     {
       id:   1,
-      name: 'Ministerio de las Culturas, las Artes y los Saberes', // ← EDITA
-      logo: '/images/aliados/ministerio-culturas.png',             // ← EDITA
+      name: 'Ministerio de las Culturas, las Artes y los Saberes', 
+      logo: '/images/aliados/logo-cultura-violeta.png',             
     },
     {
       id:   2,
-      name: 'Alcaldía de Andes',                                   // ← EDITA
-      logo: '/images/aliados/alcaldia-andes.png',                  // ← EDITA
+      name: 'Gobernación de Antioquia',                                   
+      logo: '/images/aliados/gobernacion-logo.png',                  
     },
     {
       id:   3,
-      name: 'Gobernación de Antioquia',                            // ← EDITA
-      logo: '/images/aliados/gobernacion.png',                     // ← EDITA
+      name: 'Instituto de Cultura de Antioquia',                            
+      logo: '/images/aliados/icpa-logo.png',                     
     },
     {
       id:   4,
-      name: 'Instituto de Cultura de Antioquia',                   // ← EDITA
-      logo: '/images/aliados/cultura-antioquia.png',               // ← EDITA
+      name: 'Alcaldía de Andes',                  
+      logo: '/images/aliados/alcaldia-andes-logo.png',               
     },
     {
       id:   5,
-      name: 'Banco de la República',                               // ← EDITA
-      logo: '/images/aliados/banrep.png',                          // ← EDITA
+      name: 'Empresa de Servicios Públicos de Andes',                   
+      logo: '/images/aliados/epa-logo.png',               
     },
     {
       id:   6,
-      name: 'Organizaciones Culturales del Suroeste',              // ← EDITA
-      logo: null,                                                   // ← EDITA o deja null
+      name: 'Corporación Visión Suroeste',                              
+      logo: '/images/aliados/vision-logo.jpg',                         
+    },
+    {
+      id:   7,
+      name: 'Confiar Cooperativa',              
+      logo: '/images/aliados/confiar-logo.png',                                                   
+    },
+    {
+      id:   8,
+      name: 'Sociedad de Mejoras Públicas de Andes',             
+      logo: '/images/aliados/smp-logo.PNG',                                                   
     },
     // Agrega más aliados copiando el bloque anterior
   ],
