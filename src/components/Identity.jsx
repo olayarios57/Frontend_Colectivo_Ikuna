@@ -52,12 +52,26 @@ const identityData = {
       photo: '/images/equipo/Foto-camilo.jpeg',                    
       bio:   'Gestor cultural',               
     },
-    {
+     {
       id:    4,
       name:  'Sara Olaya',                           
       role:  'Coordinadora Operativa',                            
       photo: '/images/equipo/sara-foto.jpg',                   
       bio:   'Gestora cultural',              
+    },
+    {
+      id:    5,
+      name:  'Estefanny Pérez Colorado',                           
+      role:  'Mediadora Territorial',                            
+      photo: '/images/equipo/foto-estefa.jpg',                   
+      bio:   'Gestora cultural',              
+    },
+    {
+      id:    6,
+      name:  'Juan Miguel Ramírez',                           
+      role:  'Facilitador Logístico',                            
+      photo: '/images/equipo/foto-miguel.jpeg',                   
+      bio:   'Artista experimental',              
     },
   ],
 
