@@ -62,7 +62,7 @@ const identityData = {
     {
       id:    5,
       name:  'Estefanny Pérez Colorado',                           
-      role:  'Mediadora Territorial',                            
+      role:  'Cofundadora y mediadora territorial',                            
       photo: '/images/equipo/foto-estefa.jpg',                   
       bio:   'Gestora cultural',              
     },

@@ -2,8 +2,9 @@
 import clientAxios from '../config/axios';
 
 export const apiService = {
-    // --- AUTH ---
+    // --- AUTH REAL ---
     login: async (credentials) => {
+        // Envía username y password a tu endpoint de Spring Boot
         const response = await clientAxios.post('/admin/login', credentials);
         return response.data;
     },
@@ -12,12 +13,13 @@ export const apiService = {
         return response.data;
     },
 
-    // --- PROYECTOS (PÚBLICO Y ADMIN) ---
+    // --- PROYECTOS ---
     getPortfolio: async () => {
         const response = await clientAxios.get('/ikuna/portfolio');
         return response.data;
     },
     createProject: async (projectData) => {
+        // Asegúrate de que projectData use los nombres: title, category, status, executionDate...
         const response = await clientAxios.post('/ikuna/projects', projectData);
         return response.data;
     },
@@ -26,7 +28,7 @@ export const apiService = {
         return response.data;
     },
 
-    // --- USUARIOS (ADMIN) ---
+    // --- GESTIÓN DE USUARIOS ---
     getPendingUsers: async () => {
         const response = await clientAxios.get('/admin/users/pending');
         return response.data;
@@ -49,12 +51,12 @@ export const apiService = {
         const response = await clientAxios.get(`/budgets/project/${projectId}`);
         return response.data;
     },
-    // 👇 AGREGA ESTA NUEVA FUNCIÓN 👇
     createBudget: async (budgetData) => {
         const response = await clientAxios.post('/budgets/budgets', budgetData);
         return response.data;
     },
 
+    // --- ACCIONES DE ADMINISTRADOR ---
     disableUser: async (id) => {
         const response = await clientAxios.patch(`/admin/users/${id}/disable`);
         return response.data;
