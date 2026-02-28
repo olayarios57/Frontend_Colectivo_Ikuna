@@ -1,44 +1,58 @@
-const ADMIN_CREDENTIALS = {
-  username: 'admin',
-  password: 'ikuna2024',
-};
+// src/services/authServices.js
+import { apiService } from './apiService';
 
-const ADMIN_USER = {
-  username: 'admin',
-  role: 'superadmin',
-  name: 'Administrador Principal',
-  email: 'admin@ikuna.com',
-};
-
-export function login(username, password) {
-  if (
-    username === ADMIN_CREDENTIALS.username &&
-    password === ADMIN_CREDENTIALS.password
-  ) {
-    return { success: true, user: ADMIN_USER };
+/**
+ * Realiza el login consultando al backend en Render
+ */
+export async function login(username, password) {
+  try {
+    const userData = await apiService.login({ username, password });
+    
+    // aquí, el backend validó las credenciales en la base de datos
+    // Retornamos éxito y el objeto del usuario (ej. el de sara_olaya)
+    return { 
+      success: true, 
+      user: userData 
+    };
+  } catch (error) {
+    console.error("Error en la autenticación:", error);
+    return { 
+      success: false, 
+      user: null, 
+      message: error.response?.data?.message || 'Usuario o contraseña incorrectos' 
+    };
   }
-  return { success: false, user: null };
 }
 
-export function registerRequest(userData) {
-  // Simula el registro pendiente de aprobación
-  // En una implementación real, esto haría una llamada al backend
-  return {
-    success: true,
-    message:
-      '¡Registro exitoso! Tu solicitud está pendiente de aprobación por el administrador principal.',
-  };
+/**
+ * Registra una nueva solicitud de usuario en la base de datos
+ */
+export async function registerRequest(userData) {
+  try {
+    await apiService.register(userData);
+    return {
+      success: true,
+      message: '¡Registro exitoso! Tu solicitud está pendiente de aprobación por el administrador.',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: 'No se pudo procesar el registro. Inténtalo de nuevo más tarde.',
+    };
+  }
 }
 
-export function sendPasswordRecovery(email) {
-  // Simula el envío de email de recuperación
-  // En una implementación real, esto haría una llamada al backend
+/**
+ * Simulación de recuperación (este suele ser un endpoint aparte)
+ */
+export async function sendPasswordRecovery(email) {
   return {
     success: true,
     message: 'Se ha enviado un enlace de recuperación a tu correo electrónico.',
   };
 }
 
+// Filtros locales para la UI del administrador
 export function approveUser(userId, usersList) {
   return usersList.filter((u) => u.id !== userId);
 }
